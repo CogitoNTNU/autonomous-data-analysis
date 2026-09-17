@@ -46,7 +46,7 @@ jobs:
           uv run --project backend pytest backend/tests --doctest-modules --cov=backend/app --cov-report=html
 
       - name: Upload Coverage Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: code-coverage-report
           path: htmlcov/
