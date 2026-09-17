@@ -145,6 +145,10 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# Ruff and Python type-checker caches
+.ruff_cache/
+.pyright/
+
 # Pyre type checker
 .pyre/
 
@@ -193,13 +197,18 @@ bower_components
 .lock-wscript
 
 # IDEs and editors
-.idea
+.idea/
+.fleet/
+.history/
 .project
 .classpath
 .c9/
 *.launch
 .settings/
 *.sublime-workspace
+*.swp
+*.swo
+*~
 
 # IDE - VSCode
 .vscode/*
@@ -231,6 +240,14 @@ jspm_packages/
 # Optional eslint cache
 .eslintcache
 
+# Frontend framework and bundler caches
+.nuxt/
+.vite/
+.parcel-cache/
+.turbo/
+.svelte-kit/
+storybook-static/
+
 # Optional REPL history
 .node_repl_history
 
@@ -241,7 +258,9 @@ jspm_packages/
 .yarn-integrity
 
 # dotenv environment variables file
-.env
+.env.*
+!.env.example
+!.env.template
 
 # next.js build output
 .next
@@ -251,4 +270,6 @@ lerna-debug.log
 
 # System Files
 .DS_Store
+._*
 Thumbs.db
+Desktop.ini
