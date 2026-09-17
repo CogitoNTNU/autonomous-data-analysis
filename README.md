@@ -21,8 +21,8 @@ The agents share validated tools for dataset inspection, preprocessing, statisti
 ## Prerequisites
 
 - [Git](https://git-scm.com/)
-- [Python 3.12+](https://www.python.org/downloads/)
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- [Python 3.12.13](https://www.python.org/downloads/release/python-31213/)
+- [uv 0.11.21](https://docs.astral.sh/uv/getting-started/installation/)
 
 ## Setup
 
@@ -60,12 +60,12 @@ inspect_dataset(Path("path/to/dataset.csv"))
 │   ├── app/       # API, agents, and analysis tools
 │   ├── data/      # Example datasets
 │   ├── tests/     # Backend tests
-│   ├── .python-version
 │   ├── pyproject.toml
 │   └── uv.lock
 ├── frontend/      # React application
 ├── docs/          # Documentation content and MkDocs config
 ├── .config/       # Shared development-tool configuration
+├── .python-version # Shared Python version for local tooling and uv
 └── README.md
 ```
 
