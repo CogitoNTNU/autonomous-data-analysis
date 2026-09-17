@@ -29,7 +29,8 @@ The agents share validated tools for dataset inspection, preprocessing, statisti
 ```bash
 git clone https://github.com/CogitoNTNU/autonomous-data-analysis.git
 cd autonomous-data-analysis
-uv sync
+uv sync --project backend
+uv run --project backend pre-commit install --config .config/pre-commit-config.yaml
 ```
 
 ## Usage
@@ -37,7 +38,7 @@ uv sync
 Inspect the included penguins dataset:
 
 ```bash
-python kien-test/inspect_dataset.py
+uv run --project backend python -m backend.app.tools.inspect_dataset
 ```
 
 The command prints the dataset dimensions, missing values, inferred datatypes, and duplicate-row count.
@@ -46,16 +47,32 @@ To inspect another CSV file from Python:
 
 ```python
 from pathlib import Path
-import runpy
+from backend.app.tools.inspect_dataset import inspect_dataset
 
-module = runpy.run_path("kien-test/inspect_dataset.py")
-module["inspect_dataset"](Path("path/to/dataset.csv"))
+inspect_dataset(Path("path/to/dataset.csv"))
+```
+
+## Project structure
+
+```text
+.
+├── backend/
+│   ├── app/       # API, agents, and analysis tools
+│   ├── data/      # Example datasets
+│   ├── tests/     # Backend tests
+│   ├── .python-version
+│   ├── pyproject.toml
+│   └── uv.lock
+├── frontend/      # React application
+├── docs/          # Documentation content and MkDocs config
+├── .config/       # Shared development-tool configuration
+└── README.md
 ```
 
 ## Testing
 
 ```bash
-uv run pytest
+uv run --project backend pytest backend/tests
 ```
 
 ## Team
