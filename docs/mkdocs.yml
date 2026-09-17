@@ -63,7 +63,9 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          import:
+          paths:
+            - ../backend
+          inventories:
             - https://docs.python.org/3/objects.inv
           options:
             docstring_section_style: list
@@ -79,7 +81,7 @@ plugins:
             show_symbol_type_toc: true
             summary: true
   - api-autonav:
-      modules: ['backend/app/']
+      modules: ["../backend/app/"]
       module_options:
         package.submodule:
           docstring_style: google
