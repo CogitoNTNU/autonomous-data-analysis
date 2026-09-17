@@ -1,4 +1,6 @@
-site_name: PROJECT-TEMPLATE
+site_name: Autonomous Data Analysis
+docs_dir: .
+site_dir: ../site
 
 theme:
   name: material
@@ -77,7 +79,7 @@ plugins:
             show_symbol_type_toc: true
             summary: true
   - api-autonav:
-      modules: ['src/']
+      modules: ['backend/app/']
       module_options:
         package.submodule:
           docstring_style: google
@@ -86,4 +88,3 @@ plugins:
       nav_item_prefix: "<code class='doc-symbol doc-symbol-nav doc-symbol-module'></code>"
       exclude_private: true
       on_implicit_namespace_package: "warn"
-

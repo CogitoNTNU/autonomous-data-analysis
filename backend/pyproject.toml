@@ -1,10 +1,10 @@
 [project]
-name = "PROJECT-TEMPLATE"
+name = "autonomous-data-analysis"
 version = "0.0.1"
-description = "Add your description here"
+description = "Agent-based analysis of structured datasets"
 readme = "README.md"
 requires-python = ">=3.12"
-license-files = ["LICENSE"]
+license = "MIT"
 dependencies = []
 
 

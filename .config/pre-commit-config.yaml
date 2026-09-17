@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 exclude: |
   (?x)^(
-      docs/site/.*|       # Exclude mkdocs compiled files
+      site/.*|            # Exclude compiled MkDocs files
       docs/docs/jupyter-notebooks_files/.*|       # Exclude Jupyter Notebooks files
       jupyter-experiments/.*|       # Exclude jupyter-experiments
       \.history/.*|       # Exclude history files
@@ -118,12 +118,15 @@ repos:
       # STRICT -- This (kind of) enforces use of uv
       - id: uv-sync
         name: "⚡️ uv · Sync dependencies with uv"
+        args: [--project, backend]
       # Update the uv lockfile
       - id: uv-lock
         name: "⚡️ uv · Update dependency lockfile"
+        args: [--project, backend]
       # Export to txt
       - id: uv-export
         name: "⚡️ uv · Export dependencies to requirements.txt"
+        args: [--project, backend, --output-file, backend/requirements.txt]
 
 
   # ---------------------------------------------------------------------------- #
