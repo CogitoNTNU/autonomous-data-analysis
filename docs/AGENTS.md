@@ -15,4 +15,3 @@ rules.
 - Use relative links for repository documentation.
 - Verify the MkDocs build before submitting documentation changes.
 - Never include credentials, private datasets, internal URLs, or user data.
-

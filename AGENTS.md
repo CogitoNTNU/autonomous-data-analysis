@@ -74,4 +74,3 @@ more specific `AGENTS.md` add to these rules for files below that directory.
   checks, or builds fail.
 - Use Conventional Commit titles: `type(scope): concise imperative summary`.
 - Keep commits focused and PRs small enough to review confidently.
-

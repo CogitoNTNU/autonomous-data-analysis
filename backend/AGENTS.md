@@ -69,4 +69,3 @@ uv run --project backend pytest backend/tests
 ```
 
 Run the configured pre-commit hooks before submitting broad changes.
-

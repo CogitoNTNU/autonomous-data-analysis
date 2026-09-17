@@ -29,4 +29,3 @@ Follow the repository-level `AGENTS.md` in addition to these frontend rules.
 - Include keyboard and accessibility assertions for interactive features.
 - Add an end-to-end test for the primary upload, question, clarification, and
   result flow once those features exist.
-
