@@ -1,7 +1,6 @@
 """Deterministic Analysis Agent (cogito.txt §9.3)."""
 
-from dataclasses import dataclass, field
-
+from backend.app.agents.analysis.schema import EngineResult
 from backend.app.contracts.models import (
     AnalysisResult,
     AnalysisUpdates,
@@ -20,13 +19,6 @@ from backend.app.tools.registry import (
 )
 
 SOURCE = "analysis"
-
-
-@dataclass
-class EngineResult:
-    response: AgentResponse[AnalysisUpdates]
-    missing_steps: list[str]
-    execution_log: list[str] = field(default_factory=list)
 
 
 def run_analysis(
