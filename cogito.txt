@@ -1,0 +1,1246 @@
+# Autonomous Data Analysis — Team Implementation Plan
+
+Team: use this document as the implementation script. Build the system incrementally. Do not implement all agents in one pull request. Every phase must have validated contracts, unit tests, and clear acceptance criteria before the next phase begins.
+
+## 1. Objective
+
+We are building a modular data-analysis system with six components:
+
+1. Planner
+2. Preprocessing
+3. Analysis
+4. Interpretation
+5. Critic
+6. Chat
+
+LangGraph acts as the harness. It owns:
+
+- Shared workflow state
+- Node execution
+- Routing
+- Clarification pauses
+- Critic feedback loops
+- Retry and step limits
+- Checkpointing
+- Logging and tracing
+
+Agents reason and coordinate. Tools perform all calculations and data transformations.
+
+## 2. Core engineering rules
+
+1. Language models never calculate statistics directly.
+2. Language models cannot execute arbitrary code or select unregistered tools.
+3. Every tool has validated inputs and structured outputs.
+4. Raw datasets are immutable.
+5. Every processed dataset receives a new version.
+6. Every result records which dataset version produced it.
+7. Large tables, figures, and models are stored as artifacts, not directly in graph state.
+8. Every agent is independently testable.
+9. Agent-to-agent communication happens through shared typed contracts.
+10. Every loop has an explicit maximum number of iterations.
+
+---
+
+# 3. Shared contracts
+
+Implement these as Pydantic models before implementing agents or LangGraph.
+
+## 3.1 Dataset reference
+
+```python
+class DatasetReference:
+    dataset_id: str
+    version: str
+    uri: str
+    format: Literal["csv", "parquet", "database"]
+    content_hash: str
+    parent_version: str | None
+    metadata: DatasetMetadata
+```
+
+The reference points to data. It must not contain the complete dataset.
+
+## 3.2 Dataset metadata
+
+```python
+class DatasetMetadata:
+    row_count: int
+    column_count: int
+    columns: list[ColumnMetadata]
+    missing_value_count: int
+    duplicate_row_count: int
+    created_at: datetime
+```
+
+```python
+class ColumnMetadata:
+    name: str
+    data_type: str
+    nullable: bool
+    missing_count: int
+    unique_count: int | None
+    example_values: list[Any]
+```
+
+## 3.3 Plan step
+
+```python
+class PlanStep:
+    step_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    depends_on: list[str]
+```
+
+Validation requirements:
+
+- `step_id` must be unique within the plan.
+- `tool_name` must exist in the tool registry.
+- Dependencies must reference earlier or valid steps.
+- Dependency cycles are forbidden.
+- Arguments must satisfy the selected tool’s schema.
+
+## 3.4 Analysis plan
+
+```python
+class AnalysisPlan:
+    plan_id: str
+    objective: str
+    required_columns: list[str]
+    preprocessing_steps: list[PlanStep]
+    analysis_steps: list[PlanStep]
+    expected_outputs: list[str]
+    assumptions: list[str]
+```
+
+## 3.5 Preprocessing report
+
+```python
+class PreprocessingReport:
+    input_dataset_version: str
+    output_dataset_version: str
+    changes: list[PreprocessingChange]
+    affected_columns: list[str]
+    rows_before: int
+    rows_after: int
+    quality_warnings: list[str]
+    no_changes: bool
+```
+
+```python
+class PreprocessingChange:
+    step_id: str
+    tool_name: str
+    description: str
+    affected_columns: list[str]
+    rows_affected: int | None
+```
+
+## 3.6 Analysis result
+
+```python
+class AnalysisResult:
+    result_id: str
+    step_id: str
+    dataset_version: str
+    method: str
+    parameters: dict[str, Any]
+    values: Any | None
+    table_artifact_id: str | None
+    sample_size: int
+    warnings: list[str]
+```
+
+Small results may be stored in `values`. Large results must use an artifact.
+
+## 3.7 Artifact reference
+
+```python
+class ArtifactReference:
+    artifact_id: str
+    artifact_type: Literal["table", "figure", "model", "file"]
+    uri: str
+    title: str
+    metadata: dict[str, Any]
+    produced_by_step: str
+```
+
+## 3.8 Interpretation
+
+```python
+class Interpretation:
+    summary: str
+    key_findings: list[Finding]
+    limitations: list[str]
+    assumptions_used: list[str]
+```
+
+```python
+class Finding:
+    statement: str
+    supporting_result_ids: list[str]
+    confidence: Literal["low", "medium", "high"]
+```
+
+Every finding must reference calculated results.
+
+## 3.9 Critique
+
+```python
+class Critique:
+    approved: bool
+    feedback: str
+    issues: list[CritiqueIssue]
+    retry_target: Literal[
+        "planner",
+        "preprocessing",
+        "analysis",
+        "interpretation",
+    ] | None
+```
+
+```python
+class CritiqueIssue:
+    category: Literal[
+        "incorrect",
+        "unsupported_claim",
+        "incomplete",
+        "methodology",
+        "data_quality",
+        "bias",
+        "safety",
+    ]
+    description: str
+    related_step_ids: list[str]
+    severity: Literal["warning", "error"]
+```
+
+---
+
+# 4. Tool system
+
+## 4.1 Common tool interface
+
+Every tool should expose:
+
+```python
+class Tool:
+    name: str
+    description: str
+    input_model: type[BaseModel]
+    output_model: type[BaseModel]
+
+    def execute(self, request: BaseModel) -> BaseModel:
+        ...
+```
+
+Every execution should produce an envelope:
+
+```python
+class ToolExecution:
+    execution_id: str
+    tool_name: str
+    step_id: str
+    started_at: datetime
+    completed_at: datetime
+    status: Literal["success", "failed"]
+    output: Any | None
+    warnings: list[str]
+    error: ToolError | None
+```
+
+## 4.2 Tool registry
+
+Required functions:
+
+```python
+register(tool: Tool) -> None
+get(tool_name: str) -> Tool
+list_tools() -> list[ToolDefinition]
+validate_call(tool_name: str, arguments: dict) -> ValidatedToolCall
+execute(tool_name: str, arguments: dict) -> ToolExecution
+```
+
+The Planner receives tool definitions but never raw Python callables.
+
+The registry must reject:
+
+- Unknown tools
+- Invalid arguments
+- Duplicate tool names
+- Arbitrary Python or SQL unless explicitly supported
+- File access outside approved dataset and artifact locations
+
+---
+
+# 5. Dataset tools
+
+## `inspect_schema`
+
+Input:
+
+```python
+dataset: DatasetReference
+```
+
+Output:
+
+```python
+metadata: DatasetMetadata
+warnings: list[str]
+```
+
+Purpose:
+
+- Inspect columns
+- Infer data types
+- Count missing values
+- Count duplicate rows
+- Generate safe example values
+
+## `preview_data`
+
+Input:
+
+```python
+dataset: DatasetReference
+columns: list[str] | None
+limit: int
+```
+
+Output:
+
+```python
+rows: list[dict]
+returned_rows: int
+```
+
+Restrictions:
+
+- Enforce a small maximum row count.
+- Do not return an entire dataset.
+
+## `column_profile`
+
+Input:
+
+```python
+dataset: DatasetReference
+column: str
+```
+
+Output:
+
+```python
+data_type: str
+missing_count: int
+unique_count: int
+minimum: float | None
+maximum: float | None
+mean: float | None
+quantiles: dict[str, float] | None
+top_values: list[ValueCount] | None
+warnings: list[str]
+```
+
+## `get_metadata`
+
+Input:
+
+```python
+dataset: DatasetReference
+```
+
+Output:
+
+```python
+metadata: DatasetMetadata
+```
+
+---
+
+# 6. Preprocessing tools
+
+Every preprocessing tool receives a dataset reference and returns a new dataset reference plus a change record.
+
+## Shared preprocessing output
+
+```python
+class TransformationResult:
+    processed_dataset: DatasetReference
+    change: PreprocessingChange
+    warnings: list[str]
+```
+
+## Initial preprocessing tools
+
+### `handle_missing_values`
+
+Input:
+
+```python
+dataset: DatasetReference
+columns: list[str]
+strategy: Literal["drop_rows", "mean", "median", "mode", "constant"]
+constant_value: Any | None
+```
+
+### `remove_duplicates`
+
+Input:
+
+```python
+dataset: DatasetReference
+subset: list[str] | None
+keep: Literal["first", "last"]
+```
+
+### `change_datatypes`
+
+Input:
+
+```python
+dataset: DatasetReference
+conversions: dict[str, str]
+invalid_value_strategy: Literal["error", "null", "drop"]
+```
+
+### `filter_rows`
+
+Input:
+
+```python
+dataset: DatasetReference
+conditions: list[FilterCondition]
+```
+
+### `select_columns`
+
+Input:
+
+```python
+dataset: DatasetReference
+columns: list[str]
+```
+
+## Later preprocessing tools
+
+Do not implement these in the first preprocessing milestone:
+
+- `encode_categorical`
+- `scale_features`
+- `handle_outliers`
+- `create_features`
+
+---
+
+# 7. Analysis tools
+
+## `descriptive_statistics`
+
+Input:
+
+```python
+dataset: DatasetReference
+columns: list[str]
+statistics: list[
+    Literal["count", "mean", "median", "std", "min", "max", "quantiles"]
+]
+```
+
+Output:
+
+```python
+result: AnalysisResult
+```
+
+## `group_aggregate`
+
+Input:
+
+```python
+dataset: DatasetReference
+group_by: list[str]
+aggregations: list[Aggregation]
+```
+
+Example:
+
+```python
+Aggregation(
+    column="body_mass_g",
+    function="mean",
+    alias="average_body_mass",
+)
+```
+
+## `correlation_analysis`
+
+Input:
+
+```python
+dataset: DatasetReference
+columns: list[str]
+method: Literal["pearson", "spearman", "kendall"]
+```
+
+Output includes:
+
+- Correlation matrix artifact
+- Sample size
+- Missing-value handling
+- Warnings about interpretation
+
+## `categorical_analysis`
+
+Input:
+
+```python
+dataset: DatasetReference
+column: str
+normalize: bool
+```
+
+## `time_series_analysis`
+
+Implement later.
+
+Input:
+
+```python
+dataset: DatasetReference
+date_column: str
+value_column: str
+frequency: str
+aggregation: str
+```
+
+## `custom_query`
+
+Do not implement initially. Arbitrary code and unrestricted SQL introduce unnecessary security and validation problems.
+
+---
+
+# 8. Visualization tools
+
+Visualizations must consume calculated results or a dataset reference. Interpretation agents must not invent chart values.
+
+## Initial tools
+
+- `bar_chart`
+- `line_chart`
+- `scatter_plot`
+- `histogram`
+- `boxplot`
+- `heatmap`
+
+Common output:
+
+```python
+class VisualizationResult:
+    artifact: ArtifactReference
+    source_result_ids: list[str]
+    warnings: list[str]
+```
+
+Common inputs:
+
+```python
+title: str
+x: str
+y: str | None
+group: str | None
+source_result_id: str | None
+dataset: DatasetReference | None
+```
+
+At least one of `source_result_id` or `dataset` must be supplied.
+
+---
+
+# 9. Agent responsibilities
+
+## 9.1 Planner
+
+Receives:
+
+```python
+user_query
+dataset
+conversation_context
+critique
+available_tools
+```
+
+Returns:
+
+```python
+plan
+clarification_question
+```
+
+Responsibilities:
+
+- Understand the user’s objective.
+- Inspect available metadata.
+- Select only registered tools.
+- Create valid preprocessing and analysis steps.
+- Declare required columns.
+- State assumptions explicitly.
+- Ask for clarification when the objective is ambiguous.
+
+The Planner does not:
+
+- Transform data
+- Calculate statistics
+- Produce final answers
+- Execute tools
+
+Clarification conditions include:
+
+- The requested outcome is unclear.
+- Required columns cannot be identified.
+- Multiple interpretations would produce meaningfully different analyses.
+- The requested analysis is unsupported by available data.
+
+## 9.2 Preprocessing Agent
+
+Receives:
+
+```python
+dataset
+plan.preprocessing_steps
+```
+
+Returns:
+
+```python
+processed_dataset
+preprocessing_report
+```
+
+Responsibilities:
+
+- Validate every step through the registry.
+- Execute preprocessing steps in dependency order.
+- Preserve raw data.
+- Create versioned processed datasets.
+- Report every change.
+- Return the input reference unchanged when no processing is required.
+
+This component should be mostly deterministic. It does not need an LLM for normal execution.
+
+## 9.3 Analysis Agent
+
+Receives:
+
+```python
+processed_dataset
+plan.analysis_steps
+preprocessing_report
+```
+
+Returns:
+
+```python
+analysis_results
+artifacts
+```
+
+Responsibilities:
+
+- Resolve step dependencies.
+- Execute registered analysis and visualization tools.
+- Collect structured results.
+- Record sample sizes and warnings.
+- Stop downstream steps when a required dependency fails.
+
+This component should also be deterministic.
+
+## 9.4 Interpretation Agent
+
+Receives:
+
+```python
+user_query
+plan.objective
+analysis_results
+artifacts
+preprocessing_report
+```
+
+Returns:
+
+```python
+interpretation
+```
+
+Responsibilities:
+
+- Explain calculated results.
+- Connect findings to the user’s objective.
+- Reference supporting `result_id` values.
+- Include limitations, warnings, and assumptions.
+- Avoid causal language unless the method supports causality.
+
+It must not:
+
+- Calculate missing values
+- Invent results
+- Ignore tool warnings
+- Present unsupported conclusions
+
+## 9.5 Critic Agent
+
+Receives:
+
+```python
+user_query
+plan
+preprocessing_report
+analysis_results
+interpretation
+artifacts
+```
+
+Returns:
+
+```python
+critique
+```
+
+Review checklist:
+
+- Did the workflow answer the objective?
+- Were the required columns available?
+- Were preprocessing changes justified?
+- Do all findings reference real results?
+- Are numerical claims identical to tool outputs?
+- Are sample sizes disclosed?
+- Are warnings and limitations represented?
+- Is correlation presented as causation?
+- Are assumptions reasonable and visible?
+- Are there signs of selection bias or invalid methodology?
+
+## 9.6 Chat Agent
+
+Receives:
+
+```python
+user_query
+clarification_question
+approved interpretation
+analysis_results
+artifacts
+conversation_context
+```
+
+Returns:
+
+```python
+final_response
+suggested_follow_ups
+```
+
+Responsibilities:
+
+- Present clarification questions when analysis cannot start.
+- Present approved results in understandable language.
+- Link to figures and tables.
+- Preserve limitations.
+- Support follow-up conversation.
+
+It must not execute analysis tools.
+
+---
+
+# 10. LangGraph state
+
+```python
+class AnalysisState:
+    request_id: str
+    user_query: str
+    dataset: DatasetReference
+    conversation_context: list[Message]
+
+    plan: AnalysisPlan | None
+    clarification_question: str | None
+
+    processed_dataset: DatasetReference | None
+    preprocessing_report: PreprocessingReport | None
+
+    analysis_results: list[AnalysisResult]
+    artifacts: list[ArtifactReference]
+
+    interpretation: Interpretation | None
+    critique: Critique | None
+    final_response: str | None
+
+    revision_count: int
+    tool_failure_count: int
+    current_node: str
+    errors: list[WorkflowError]
+```
+
+Do not store:
+
+- Complete DataFrames
+- Binary figures
+- Large tables
+- Model files
+- Database connections
+- Secrets
+
+---
+
+# 11. Main workflow
+
+```text
+START
+  │
+  ▼
+Planner
+  │
+  ├── clarification required
+  │        │
+  │        ▼
+  │     Interrupt / Chat
+  │        │
+  │        ▼
+  │     User response
+  │        │
+  │        └── Planner
+  │
+  ▼
+Preprocessing
+  │
+  ▼
+Analysis
+  │
+  ▼
+Interpretation
+  │
+  ▼
+Critic
+  │
+  ├── approved ────────────────► Chat ─► END
+  │
+  └── rejected
+           │
+           ▼
+        Planner
+```
+
+---
+
+# 12. Required loops and limits
+
+## Clarification loop
+
+```text
+Planner → clarification interrupt → user response → Planner
+```
+
+Rules:
+
+- Pause execution using a LangGraph interrupt.
+- Preserve the existing state through checkpointing.
+- Maximum clarification rounds: 3.
+- After the limit, return a clear failure message.
+
+## Critic loop
+
+```text
+Critic → Planner → Preprocessing → Analysis → Interpretation → Critic
+```
+
+Rules:
+
+- Critique is added to Planner input.
+- Planner creates a new `plan_id`.
+- Existing results remain available for audit but are not silently reused.
+- Maximum revisions: 2.
+- After the limit, Chat returns the best available result with an explicit warning that validation did not pass.
+
+## Tool retry loop
+
+Retry only transient failures:
+
+- Temporary storage errors
+- Database connection errors
+- Timeouts
+
+Do not retry:
+
+- Invalid arguments
+- Unknown columns
+- Unsupported data types
+- Unknown tools
+- Invalid plan dependencies
+
+Maximum tool retries: 1.
+
+## Step limit
+
+Set a maximum number of tool executions per run, initially 20. This prevents malformed plans from creating unbounded workflows.
+
+---
+
+# 13. Error handling
+
+```python
+class WorkflowError:
+    error_id: str
+    node: str
+    step_id: str | None
+    category: Literal[
+        "validation",
+        "tool_execution",
+        "storage",
+        "timeout",
+        "configuration",
+        "internal",
+    ]
+    message: str
+    retryable: bool
+```
+
+Routing:
+
+| Error | Route |
+|---|---|
+| Invalid plan | Planner |
+| Missing column | Planner |
+| Invalid preprocessing request | Planner |
+| Tool timeout | Retry once |
+| Storage failure | Retry once, then Chat |
+| Interpretation validation failure | Interpretation |
+| Critic rejection | Planner |
+| Step limit reached | Chat with warning |
+| Unexpected internal error | Chat with safe error message |
+
+Never expose stack traces, credentials, or internal storage paths to the user.
+
+---
+
+# 14. Storage and versioning
+
+Use separate abstractions:
+
+```python
+DatasetStore
+ArtifactStore
+CheckpointStore
+```
+
+## Dataset store functions
+
+```python
+save_raw_dataset(...)
+save_processed_dataset(...)
+get_dataset(reference)
+get_metadata(reference)
+verify_content_hash(reference)
+```
+
+Version format can initially be:
+
+```text
+raw-v1
+processed-v1
+processed-v2
+```
+
+Each processed version records:
+
+- Parent version
+- Transformation steps
+- Creation time
+- Content hash
+- Producing workflow ID
+
+## Artifact store functions
+
+```python
+save_table(...)
+save_figure(...)
+save_model(...)
+get_artifact(...)
+```
+
+Local filesystem storage is sufficient initially. Postgres/object storage can be added later behind the same interface.
+
+---
+
+# 15. Logging and tracing
+
+Every workflow run must have a `request_id`.
+
+Log:
+
+- Node entered and exited
+- Plan ID
+- Dataset version
+- Tool name
+- Step ID
+- Execution duration
+- Result or artifact ID
+- Warning count
+- Critic decision
+- Revision count
+- Error category
+
+Do not log:
+
+- Full datasets
+- Secrets
+- User credentials
+- Sensitive raw values
+
+---
+
+# 16. Suggested project structure
+
+```text
+backend/app/
+├── agents/
+│   ├── planner/
+│   ├── preprocessing/
+│   ├── analysis/
+│   ├── interpretation/
+│   ├── critic/
+│   └── chat/
+├── models/
+│   ├── dataset.py
+│   ├── plan.py
+│   ├── results.py
+│   ├── critique.py
+│   ├── errors.py
+│   └── state.py
+├── graph/
+│   ├── builder.py
+│   ├── routing.py
+│   ├── nodes.py
+│   └── limits.py
+├── tools/
+│   ├── registry.py
+│   ├── dataset/
+│   ├── preprocessing/
+│   ├── analysis/
+│   └── visualization/
+├── storage/
+│   ├── datasets.py
+│   ├── artifacts.py
+│   └── checkpoints.py
+└── api/
+    └── routes.py
+```
+
+---
+
+# 17. Implementation sequence
+
+## Phase 1 — Contracts
+
+Implement only:
+
+- Dataset models
+- Plan models
+- Result models
+- Critique models
+- Workflow state
+- Validation tests
+
+Acceptance criteria:
+
+- Invalid plans are rejected.
+- Dependency cycles are rejected.
+- Missing required fields are rejected.
+- Models serialize to JSON.
+- No LangGraph dependency is needed yet.
+
+## Phase 2 — Registry and dataset inspection
+
+Implement:
+
+- Tool interface
+- Tool registry
+- `inspect_schema`
+- `get_metadata`
+- `preview_data`
+- `column_profile`
+
+Acceptance criteria:
+
+- Unknown tools are rejected.
+- Invalid arguments are rejected before execution.
+- The penguins dataset can be inspected.
+- Tools return Pydantic models.
+
+## Phase 3 — Minimal Planner
+
+Implement:
+
+- Planner input/output
+- Available-tool prompt
+- Structured plan output
+- Clarification output
+- Plan validation
+
+Acceptance criteria:
+
+- Planner selects only registered tools.
+- Planner asks for clarification on ambiguous requests.
+- Planner cannot return an invalid plan.
+- Model calls can be replaced with test doubles.
+
+## Phase 4 — No-op Preprocessing
+
+Implement:
+
+- Preprocessing Agent
+- Empty preprocessing plans
+- Raw-data preservation
+- No-change report
+
+Acceptance criteria:
+
+- A plan with no preprocessing returns the same dataset version.
+- The report sets `no_changes=True`.
+- No new file is created unnecessarily.
+
+## Phase 5 — First analysis path
+
+Implement:
+
+- `descriptive_statistics`
+- `group_aggregate`
+- Analysis Agent
+- Dependency ordering
+- Structured results
+
+Acceptance criteria:
+
+- The system answers one predefined penguins question.
+- Every value comes from a tool.
+- Results record sample size and dataset version.
+
+## Phase 6 — Interpretation and Critic
+
+Implement:
+
+- Grounded interpretation
+- Result references
+- Critic checklist
+- Approval/rejection models
+
+Acceptance criteria:
+
+- Unsupported claims are rejected.
+- Findings reference result IDs.
+- Warnings appear in the interpretation.
+- Both agents work without LangGraph.
+
+## Phase 7 — LangGraph harness
+
+Implement:
+
+- Shared state
+- Six nodes
+- Conditional routing
+- Critic loop
+- Step limits
+- In-memory checkpointing
+
+Acceptance criteria:
+
+- Approved workflows reach Chat.
+- Rejected workflows return to Planner.
+- The loop terminates after the configured limit.
+- A clarification pauses execution.
+
+## Phase 8 — Chat and API
+
+Implement:
+
+- Final response formatting
+- Follow-up questions
+- FastAPI endpoint
+- Request and response schemas
+
+Acceptance criteria:
+
+- The API starts a workflow.
+- Clarification can resume the same workflow.
+- Artifact references are returned to the frontend.
+- Internal errors produce safe responses.
+
+## Phase 9 — Persistent storage and observability
+
+Implement:
+
+- Persistent checkpoints
+- Dataset version storage
+- Artifact storage
+- Structured logs
+- Tracing
+
+## Phase 10 — Additional tools
+
+Add one tool at a time:
+
+- Correlation
+- Categorical analysis
+- Visualizations
+- Time-series analysis
+- Optional ML
+
+Each tool requires its own tests and documented limitations.
+
+---
+
+# 18. Pull-request strategy
+
+Use one focused PR per phase or small tool group.
+
+Suggested conventional commit titles:
+
+```text
+feat: add shared analysis contracts
+feat: add validated tool registry
+feat: add dataset inspection tools
+feat: add planner agent
+feat: add preprocessing executor
+feat: add analysis executor
+feat: add interpretation and critic agents
+feat: add LangGraph workflow harness
+feat: add chat workflow endpoint
+test: add critic loop integration tests
+```
+
+Every PR must include:
+
+- Typed inputs and outputs
+- Unit tests
+- Error cases
+- Documentation
+- No unrelated refactoring
+
+---
+
+# 19. Definition of done
+
+The first complete vertical slice is done when the system can:
+
+1. Receive a question about the penguins dataset.
+2. Inspect dataset metadata.
+3. Produce a validated plan.
+4. Return the original dataset when preprocessing is unnecessary.
+5. Execute descriptive or grouped statistics.
+6. Interpret only calculated values.
+7. Validate the interpretation through the Critic.
+8. Loop once when the Critic rejects it.
+9. Return an approved response through Chat.
+10. Trace every result back to a tool execution and dataset version.
+
+The team should begin with Phase 1 only: shared Pydantic contracts and their validation tests.
