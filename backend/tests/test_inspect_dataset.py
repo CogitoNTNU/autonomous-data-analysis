@@ -1,7 +1,7 @@
 import pytest
 
 from backend.app.storage.datasets import create_dataset_reference
-from backend.app.tools.dataset.inspection import preview_data, get_metadata
+from backend.app.tools.dataset.inspection import preview_data, get_metadata, inspect_schema
 from backend.app.tools.inspect_dataset import DEFAULT_DATASET, inspect_dataset
 
 
@@ -121,3 +121,25 @@ def test_preview_data_rejects_limit_below_minimum():
             columns=None,
             limit=0,
         )
+
+
+# tests for inspect_dataset function
+def test_inspect_schema_returns_metadata():
+    dataset = create_dataset_reference(DEFAULT_DATASET)
+
+    result = inspect_schema(dataset)
+
+    metadata = result["metadata"]
+
+    assert metadata["row_count"] == 344
+    assert metadata["column_count"] == 8
+    assert metadata["missing_value_count"] == 19
+    assert metadata["duplicate_row_count"] == 0
+
+
+def test_inspect_schema_returns_warnings():
+    dataset = create_dataset_reference(DEFAULT_DATASET)
+
+    result = inspect_schema(dataset)
+
+    assert result["warnings"] == []
