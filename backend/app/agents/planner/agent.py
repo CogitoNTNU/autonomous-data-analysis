@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from backend.app.agents.planner.schema import PlannerOutput
 from backend.app.agents.planner.validation import validate_plan
 from backend.app.contracts.errors import AgentError
 from backend.app.contracts.models import (
@@ -33,7 +34,7 @@ class PlannerContext:
 
 PlannerModel = Callable[
     [str, PlannerContext],
-    AgentResponse[PlannerUpdates],
+    PlannerOutput,
 ]
 
 
@@ -46,6 +47,7 @@ def run_planner(
     model: PlannerModel,
 ) -> AgentResponse[PlannerUpdates]:
     """Create and validate a plan or return a clarification response."""
+
     context = PlannerContext(
         user_query=user_query,
         dataset=dataset,
@@ -53,22 +55,30 @@ def run_planner(
         critique=critique,
         available_tools=registry.list_tools(),
     )
+
     prompt = PROMPT_PATH.read_text(encoding="utf-8")
-    response = model(prompt, context)
+    output = model(prompt, context)
 
-    if response.status != "success":
-        return response
+    if output.clarification is not None:
+        return AgentResponse(
+            status="needs_clarification",
+            updates=PlannerUpdates(),
+            clarification_question=output.clarification.question,
+        )
 
-    plan = response.updates.plan
+    plan = output.plan
     if plan is None:
-        return _invalid_output("Planner returned success without a plan")
+        return _invalid_output("Planner returned neither plan nor clarification")
 
     try:
         validate_plan(plan, dataset, registry)
     except ValueError as exc:
         return _invalid_output(str(exc))
 
-    return response
+    return AgentResponse(
+        status="success",
+        updates=PlannerUpdates(plan=plan),
+    )
 
 
 def _invalid_output(message: str) -> AgentResponse[PlannerUpdates]:
