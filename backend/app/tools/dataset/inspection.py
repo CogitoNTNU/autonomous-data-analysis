@@ -26,6 +26,9 @@ class PreviewDataInput(BaseModel):
     columns: list[str] | None = None
     limit: int
 
+class GetMetadataInput(BaseModel):
+    pass
+
 
 def _csv(storage_ref: str) -> Path:
     raw = Path(storage_ref)
@@ -43,6 +46,41 @@ def _csv(storage_ref: str) -> Path:
             return path
 
     raise FileNotFoundError("dataset not found or not allowed")
+
+
+def get_metadata(
+    dataset: DatasetReference,
+    **kwargs: object,
+) -> dict:
+    frame = pd.read_csv(_csv(dataset.storage_ref))
+
+    row_count = len(frame)
+    column_count = len(frame.columns)
+    missing_value_count = int(frame.isna().sum().sum())
+    duplicate_row_count = int(frame.duplicated().sum())
+
+    columns = []
+    for column in frame.columns:
+        series = frame[column]
+        column_info = {
+            "name": column,
+            "data_type": str(series.dtype),
+            "nullable": bool(series.isna().any()),
+            "missing_count": int(series.isna().sum()),
+            "unique_count": int(series.nunique()),
+            "example_values": series.dropna().head(5).tolist(),
+
+        }
+        columns.append(column_info)
+
+    return {
+        "row_count": row_count,
+        "column_count": column_count,
+        "columns": columns,
+        "missing_value_count": missing_value_count,
+        "duplicate_row_count": duplicate_row_count,
+    }
+
 
 
 def preview_data(
@@ -128,6 +166,13 @@ PREVIEW_DATA_TOOL = Tool(
     run=preview_data,
 )
 
+GET_METADATA_TOOL = Tool(
+    name="get_metadata",
+    description="Return metadata about the dataset.",
+    input_model=GetMetadataInput,
+    accepted_dtypes=frozenset(),
+    run=get_metadata,
+)
 
 COLUMN_PROFILE_TOOL = Tool(
     name="column_profile",
@@ -142,6 +187,7 @@ def inspection_registry() -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(COLUMN_PROFILE_TOOL)
     registry.register(PREVIEW_DATA_TOOL)
+    registry.register(GET_METADATA_TOOL)
     return registry
 
 
