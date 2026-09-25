@@ -15,9 +15,16 @@ ALLOWED = (
     (BACKEND / "tests" / "fixtures").resolve(),
 )
 
+MAX_PREVIEW_ROWS = 20 # Can be updated later 
+
 
 class ColumnProfileInput(BaseModel):
     column: str
+
+
+class PreviewDataInput(BaseModel):
+    columns: list[str] | None = None
+    limit: int
 
 
 def _csv(storage_ref: str) -> Path:
@@ -36,6 +43,42 @@ def _csv(storage_ref: str) -> Path:
             return path
 
     raise FileNotFoundError("dataset not found or not allowed")
+
+
+def preview_data(
+    dataset: DatasetReference,
+    **kwargs: object,
+) -> dict:
+    # Reads CSV file
+    frame = pd.read_csv(_csv(dataset.storage_ref))
+
+    # Gets input for preview_data
+    columns = kwargs.get("columns")
+    limit = int(kwargs["limit"])
+
+    if limit < 1 or limit > MAX_PREVIEW_ROWS:
+        raise ValueError(
+            f"limit must be between 1 and {MAX_PREVIEW_ROWS}"
+        )
+
+    if columns is not None:
+        missing_columns = [
+            col for col in columns 
+            if col not in frame.columns
+            ]
+
+        if missing_columns:
+            raise ValueError(f"Unknown columns: {missing_columns}")
+
+        frame = frame[columns]
+
+    preview = frame.head(limit) 
+
+    rows = preview.to_dict(orient="records")
+    return {
+        "rows": rows,
+        "returned_rows" : len(rows),
+    }
 
 
 def column_profile(
@@ -77,6 +120,14 @@ def column_profile(
         "warnings": [],
     }
 
+PREVIEW_DATA_TOOL = Tool(
+    name="preview_data",
+    description="Return a small preview of dataset rows.",
+    input_model=PreviewDataInput,
+    accepted_dtypes=frozenset(),
+    run=preview_data,
+)
+
 
 COLUMN_PROFILE_TOOL = Tool(
     name="column_profile",
@@ -90,4 +141,12 @@ COLUMN_PROFILE_TOOL = Tool(
 def inspection_registry() -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(COLUMN_PROFILE_TOOL)
+    registry.register(PREVIEW_DATA_TOOL)
     return registry
+
+
+
+
+
+
+
