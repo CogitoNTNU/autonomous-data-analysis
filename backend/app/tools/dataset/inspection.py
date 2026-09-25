@@ -17,17 +17,18 @@ ALLOWED = (
 
 MAX_PREVIEW_ROWS = 20 # Can be updated later 
 
-
-class ColumnProfileInput(BaseModel):
-    column: str
-
-
 class PreviewDataInput(BaseModel):
     columns: list[str] | None = None
     limit: int
 
 class GetMetadataInput(BaseModel):
     pass
+
+class InspectSchemaInput(BaseModel):
+    pass
+
+class ColumnProfileInput(BaseModel):
+    column: str
 
 
 def _csv(storage_ref: str) -> Path:
@@ -79,6 +80,18 @@ def get_metadata(
         "columns": columns,
         "missing_value_count": missing_value_count,
         "duplicate_row_count": duplicate_row_count,
+    }
+
+
+def inspect_schema(
+    dataset: DatasetReference,
+    **kwargs: object,
+) -> dict:
+    metadata = get_metadata(dataset)
+
+    return {
+        "metadata": metadata,
+        "warnings": [],
     }
 
 
@@ -174,6 +187,14 @@ GET_METADATA_TOOL = Tool(
     run=get_metadata,
 )
 
+INSPECT_SCHEMA_TOOL = Tool(
+    name="inspect_schema",
+    description="Inspect the dataset schema and return metadata and warnings.",
+    input_model=InspectSchemaInput,
+    accepted_dtypes=frozenset(),
+    run=inspect_schema,
+)
+
 COLUMN_PROFILE_TOOL = Tool(
     name="column_profile",
     description=("Return statistics and frequent values for one dataset column."),
@@ -188,6 +209,7 @@ def inspection_registry() -> ToolRegistry:
     registry.register(COLUMN_PROFILE_TOOL)
     registry.register(PREVIEW_DATA_TOOL)
     registry.register(GET_METADATA_TOOL)
+    registry.register(INSPECT_SCHEMA_TOOL)
     return registry
 
 
