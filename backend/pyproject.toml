@@ -3,9 +3,10 @@ name = "autonomous-data-analysis"
 version = "0.0.1"
 description = "Agent-based analysis of structured datasets"
 readme = "README.md"
-requires-python = "==3.12.13"
+requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
+    "openai>=3.19.2",
     "pandas>=3.0.5",
     "pydantic>=2.10,<3",
 ]
