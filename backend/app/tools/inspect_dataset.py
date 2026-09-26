@@ -65,7 +65,9 @@ def inspect_dataset(dataset_path: str | Path = DEFAULT_DATASET) -> dict[str, Any
         }
 
     row_signatures = [tuple(row.get(column, "") for column in columns) for row in rows]
-    duplicate_rows = sum(count - 1 for count in Counter(row_signatures).values() if count > 1)
+    duplicate_rows = sum(
+        count - 1 for count in Counter(row_signatures).values() if count > 1
+    )
 
     result = {
         "dataset": str(path),
@@ -88,10 +90,7 @@ def inspect_dataset(dataset_path: str | Path = DEFAULT_DATASET) -> dict[str, Any
     print(f"{'Column':<25} {'Datatype':<12} {'Missing':>7}")
     print("-" * 50)
     for column, details in column_details.items():
-        print(
-            f"{column:<25} {details['datatype']:<12} "
-            f"{details['missing_values']:>7}"
-        )
+        print(f"{column:<25} {details['datatype']:<12} {details['missing_values']:>7}")
     print("=" * 50)
 
     return result
