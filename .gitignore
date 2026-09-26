@@ -262,6 +262,9 @@ storybook-static/
 !.env.example
 !.env.template
 
+# Local backend datasets
+/backend/data/
+
 # next.js build output
 .next
 
