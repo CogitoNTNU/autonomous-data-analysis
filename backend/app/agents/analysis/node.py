@@ -1,7 +1,7 @@
 """State adapter a LangGraph node can call. The graph itself lives in app/graph."""
 
 from backend.app.agents.analysis.agent import run_analysis
-from backend.app.contracts.models import WarningEvent
+from backend.app.contracts.models import Plan, PlanStep, WarningEvent
 from backend.app.contracts.state import AgentState
 from backend.app.tools.registry import ToolRegistry
 
@@ -18,7 +18,7 @@ def analysis_node(
         return {"warnings": [*state["warnings"], _missing_input(state)]}
     engine = run_analysis(
         dataset,
-        plan.analysis_steps,
+        _ready_analysis_steps(plan),
         state["preprocessing_report"],
         registry,
     )
@@ -37,3 +37,19 @@ def _missing_input(state: AgentState) -> WarningEvent:
         message=f"analysis node missing {missing}",
         source=SOURCE,
     )
+
+
+def _ready_analysis_steps(plan: Plan) -> list[PlanStep]:
+    completed = {step.step_id for step in plan.preprocessing_steps}
+    return [
+        step.model_copy(
+            update={
+                "depends_on": [
+                    dependency
+                    for dependency in step.depends_on
+                    if dependency not in completed
+                ]
+            }
+        )
+        for step in plan.analysis_steps
+    ]

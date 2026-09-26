@@ -177,6 +177,7 @@ PREVIEW_DATA_TOOL = Tool(
     input_model=PreviewDataInput,
     accepted_dtypes=frozenset(),
     run=preview_data,
+    phase="inspection",
 )
 
 GET_METADATA_TOOL = Tool(
@@ -185,6 +186,7 @@ GET_METADATA_TOOL = Tool(
     input_model=GetMetadataInput,
     accepted_dtypes=frozenset(),
     run=get_metadata,
+    phase="inspection",
 )
 
 INSPECT_SCHEMA_TOOL = Tool(
@@ -193,6 +195,7 @@ INSPECT_SCHEMA_TOOL = Tool(
     input_model=InspectSchemaInput,
     accepted_dtypes=frozenset(),
     run=inspect_schema,
+    phase="inspection",
 )
 
 COLUMN_PROFILE_TOOL = Tool(
@@ -201,6 +204,7 @@ COLUMN_PROFILE_TOOL = Tool(
     input_model=ColumnProfileInput,
     accepted_dtypes=frozenset(),
     run=column_profile,
+    phase="inspection",
 )
 
 

@@ -81,7 +81,9 @@ backend/app/agents/preprocessing/
 ├── idun.py
 ├── node.py
 ├── prompt.md
-└── schemas.py
+├── registry.py
+├── schemas.py
+└── workflow.py
 ```
 
 Related shared contracts and tests are located here:
@@ -155,6 +157,32 @@ hashing, and metadata inference in `csv_dataset.py`.
 `backend/app/tools/preprocessing.py` remains as a compatibility facade for
 older imports. New internal code should import from `preprocessing_tools`.
 
+### Planner and Analysis integration
+
+The Planner and Analysis agents share contracts from
+`backend.app.contracts.models`. `workflow.py` adapts that shared
+`DatasetReference` and `PlanStep` into the preprocessing executor's local CSV
+contracts, then maps the result back to the shared dataset and report models.
+
+Add preprocessing tools to the registry used by Planner validation:
+
+```python
+from backend.app.agents.preprocessing import register_preprocessing_tools
+from backend.app.tools.analysis.descriptive import default_registry
+
+registry = register_preprocessing_tools(default_registry())
+```
+
+The workflow order is Planner, `preprocessing_node`, then `analysis_node`.
+Planner validates one shared `Plan`; preprocessing executes only
+`plan.preprocessing_steps` and returns `processed_dataset` plus
+`preprocessing_report` in the shapes Analysis already consumes. Analysis uses
+the processed dataset and `plan.analysis_steps`. Analysis steps may depend on
+preprocessing steps; the workflow marks those dependencies satisfied after
+preprocessing completes. Preprocessing steps cannot depend on analysis steps.
+Registry entries carry their workflow phase so Planner rejects tools placed in
+the wrong step list before either execution agent runs.
+
 ### `node.py`
 
 Contains the deterministic execution logic:
@@ -197,8 +225,9 @@ Contains the shared `PlanStep` contract. A step identifies a tool, its
 arguments, and any dependencies.
 
 The deterministic node executes registered steps through the local CSV tools.
-The optional Idun planner proposes steps from a request and dataset schema;
-callers can inspect them before passing them to `PreprocessingAgent.run`.
+The shared workflow adapter accepts Planner's contract `PlanStep` values and
+converts them at the boundary. The legacy Idun planner API remains for
+standalone use; the shared workflow uses the Planner agent.
 
 ### `backend/app/models/results.py`
 
@@ -288,6 +317,9 @@ PlanStep(
 The executor rejects duplicate step IDs, unknown dependencies, and cycles. It
 executes valid steps in dependency order, validates tool arguments with
 Pydantic models, and propagates updated column names between steps.
+The shared `ToolRegistry` also validates preprocessing tool names, argument
+schemas, referenced columns, and numeric-only operations before Planner accepts
+a plan.
 
 ### Preprocessing report
 
@@ -370,6 +402,15 @@ The focused test file is:
 ```text
 backend/tests/test_preprocessing_agent.py
 ```
+
+Shared workflow handoff coverage is in:
+
+```text
+backend/tests/test_preprocessing_workflow.py
+```
+
+It validates a Planner `Plan`, executes its preprocessing step, then runs the
+Analysis step against the processed dataset version.
 
 It covers:
 

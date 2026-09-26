@@ -33,6 +33,7 @@ WarningCode = Literal[
     "TIMEOUT",
     "DEPENDENCY_FAILED",
 ]
+ToolPhase = Literal["analysis", "inspection", "preprocessing"]
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,10 @@ class Tool:
     input_model: type[BaseModel]
     accepted_dtypes: frozenset[str]
     run: Callable[..., dict[str, Any]]
+    phase: ToolPhase = "analysis"
+    update_schema: Callable[
+        [dict[str, Any], BaseModel], dict[str, Any]
+    ] | None = None
 
 
 class ToolRegistry:
@@ -61,6 +66,7 @@ class ToolRegistry:
             {
                 "name": t.name,
                 "description": t.description,
+                "phase": t.phase,
                 "schema": t.input_model.model_json_schema(),
             }
             for t in self._tools.values()
@@ -80,6 +86,13 @@ def execute_step(
     tool = registry.get(step.tool_name)
     if tool is None:
         return fail(step, dataset, "TOOL_FAILURE", f"Unknown tool: {step.tool_name}")
+    if tool.phase != "analysis":
+        return fail(
+            step,
+            dataset,
+            "INVALID_DATA",
+            f"Tool {step.tool_name} cannot run in the analysis phase",
+        )
     problem = validate_call(step, dataset, tool)
     if problem:
         return fail(step, dataset, *problem)
@@ -132,7 +145,7 @@ def validate_call(
         parsed = tool.input_model.model_validate(step.arguments)
     except ValidationError as exc:
         return "INVALID_DATA", str(exc)
-    for column in getattr(parsed, "columns", []):
+    for column in _referenced_columns(parsed):
         info = dataset.dataset_schema.get(column)
         if not isinstance(info, dict):
             return "MISSING_COLUMN", f"Unknown column: {column}"
@@ -143,6 +156,29 @@ def validate_call(
                 f"{column} has dtype {info.get('datatype')}; accepted: {allowed}",
             )
     return None
+
+
+def _referenced_columns(parsed: BaseModel) -> list[str]:
+    columns: set[str] = set()
+    plural_columns = getattr(parsed, "columns", None)
+    if isinstance(plural_columns, str):
+        columns.add(plural_columns)
+    elif plural_columns:
+        columns.update(plural_columns)
+    for attribute in ("column", "subset"):
+        value = getattr(parsed, attribute, None)
+        if isinstance(value, str):
+            columns.add(value)
+        elif value:
+            columns.update(value)
+    conversions = getattr(parsed, "conversions", None)
+    if isinstance(conversions, dict):
+        columns.update(conversions)
+    for condition in getattr(parsed, "conditions", None) or []:
+        condition_column = getattr(condition, "column", None)
+        if isinstance(condition_column, str):
+            columns.add(condition_column)
+    return sorted(columns)
 
 
 def order_steps(steps: list[PlanStep]) -> list[str]:

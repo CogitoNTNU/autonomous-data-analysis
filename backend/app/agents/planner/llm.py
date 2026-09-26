@@ -9,6 +9,7 @@ from typing import Any
 from openai import OpenAI
 
 from backend.app.agents.planner.agent import PlannerContext
+from backend.app.agents.planner.context import context_message
 from backend.app.agents.planner.schema import PlannerOutput
 from backend.app.tools.registry import ToolRegistry
 
@@ -43,7 +44,7 @@ class PlannerLLM:
             },
             {
                 "role": "user",
-                "content": self._context_message(context),
+                "content": context_message(context, self.inspection_registry),
             },
         ]
 
@@ -129,24 +130,3 @@ class PlannerLLM:
             }
             for tool in self.inspection_registry.list_tools()
         ]
-
-    @staticmethod
-    def _context_message(
-        context: PlannerContext,
-    ) -> str:
-        data = {
-            "user_query": context.user_query,
-            "dataset": context.dataset.model_dump(by_alias=True),
-            "conversation_context": [
-                message.model_dump() for message in context.conversation_context
-            ],
-            "critique": (
-                context.critique.model_dump() if context.critique is not None else None
-            ),
-            "available_tools": context.available_tools,
-        }
-
-        return json.dumps(
-            data,
-            default=str,
-        )

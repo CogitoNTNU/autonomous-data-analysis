@@ -91,6 +91,31 @@ Raw datasets are immutable.
 If preprocessing is required, add preprocessing steps to the plan rather than
 assuming the dataset has already been modified.
 
+For broad dataset-cleaning requests:
+
+- You must inspect representative rows before planning. Formatting problems,
+  aliases, logical duplicates, and mixed date or numeric formats cannot be
+  determined from schema metadata alone.
+- Normalize every relevant text column with visible whitespace or casing
+  inconsistencies, not just one example column. Use title case for names,
+  lowercase for email-like identifiers, and consistent case for categories.
+- Use explicit value mappings only for aliases observed during inspection.
+- Normalize values and convert datatypes before removing duplicates.
+- For logical duplicates, use a stable subset of normalized business fields.
+  The subset must exclude unique row identifiers, because including them—or
+  comparing every column—prevents logical duplicates from matching.
+- Prefer normalized machine identifiers such as email over display labels.
+  When an email-like identifier exists, combine it with standardized dates,
+  measures, or status fields as needed; do not add names or categorical labels
+  that may contain aliases to the duplicate key.
+- Use `currency` or `float` conversion for numeric values containing currency
+  symbols or thousands separators. Omit `date_formats` unless the user
+  explicitly requires a restricted set; the tool's defaults support mixed
+  common formats.
+- Do not handle outliers unless the user explicitly requests outlier handling.
+- Make dependencies express that ordering.
+- Do not add analysis steps when the user requested cleaning only.
+
 # Statistical reasoning
 
 You determine which statistical operation should be executed, but you do not

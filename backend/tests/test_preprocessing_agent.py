@@ -383,6 +383,49 @@ def test_normalize_values_and_locale_aware_conversions(dataset, tmp_path):
     assert source.read_text(encoding="utf-8").startswith("Full Name,email,country")
 
 
+def test_custom_date_formats_fall_back_to_supported_defaults(dataset, tmp_path):
+    result, _, _, rows = _run_step(
+        dataset,
+        tmp_path,
+        "signup date\n2026/01/09\n10-01-2026\n",
+        "change_datatypes",
+        {
+            "conversions": {"signup date": "date"},
+            "date_formats": ["%Y-%m-%d"],
+        },
+    )
+
+    assert rows == [
+        {"signup date": "2026-01-09"},
+        {"signup date": "2026-01-10"},
+    ]
+    assert result.report.quality_warnings == []
+
+
+def test_normalize_values_preserves_canonical_mapping_targets(dataset, tmp_path):
+    _, _, _, rows = _run_step(
+        dataset,
+        tmp_path,
+        "country\nUSA\nUnited States\nUK\nUnited Kingdom\n",
+        "normalize_values",
+        {
+            "column": "country",
+            "case": "title",
+            "value_map": {
+                "United States": "USA",
+                "United Kingdom": "UK",
+            },
+        },
+    )
+
+    assert rows == [
+        {"country": "USA"},
+        {"country": "USA"},
+        {"country": "UK"},
+        {"country": "UK"},
+    ]
+
+
 def test_preprocessing_steps_run_after_their_dependencies(dataset, tmp_path):
     source = tmp_path / "input.csv"
     source.write_text("score,label\n1,a\n2,b\n3,c\n", encoding="utf-8")

@@ -138,7 +138,8 @@ def parse_numeric_value(value: str) -> float:
 
 
 def parse_date_value(value: str, date_formats: list[str] | None) -> str:
-    for date_format in date_formats or DEFAULT_DATE_FORMATS:
+    formats = list(dict.fromkeys([*(date_formats or []), *DEFAULT_DATE_FORMATS]))
+    for date_format in formats:
         try:
             return datetime.strptime(value.strip(), date_format).date().isoformat()
         except ValueError:
@@ -245,10 +246,14 @@ def normalize_values(
     column = arguments["column"]
     require_columns(rows, [column], fieldnames)
     case = arguments.get("case", "preserve")
+    configured_map = arguments.get("value_map", {})
     value_map = {
         " ".join(source.strip().split()).casefold(): target
-        for source, target in arguments.get("value_map", {}).items()
+        for source, target in configured_map.items()
     }
+    for target in configured_map.values():
+        canonical_key = " ".join(target.strip().split()).casefold()
+        value_map.setdefault(canonical_key, target)
 
     normalized_rows = []
     changed_rows = 0

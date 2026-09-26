@@ -6,10 +6,13 @@ import math
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MISSING_VALUES = {"", "na", "n/a", "null", "none", "nan"}
 SUPPORTED_TYPES = {"integer", "float", "string", "boolean", "date", "currency"}
+SupportedType = Literal[
+    "integer", "float", "string", "boolean", "date", "currency"
+]
 DEFAULT_DATE_FORMATS = [
     "%Y-%m-%d",
     "%d/%m/%Y",
@@ -85,11 +88,26 @@ class RemoveDuplicatesArguments(ToolArguments):
 
 
 class ChangeDatatypesArguments(ToolArguments):
-    conversions: dict[str, str] | None = None
+    conversions: dict[str, SupportedType] | None = None
     column: str | None = None
-    target_type: str | None = None
+    target_type: SupportedType | None = None
     invalid_value_strategy: Literal["error", "null", "drop"] = "error"
     date_formats: list[str] | None = None
+
+    @field_validator("conversions", mode="before")
+    @classmethod
+    def normalize_conversion_types(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        return {
+            column: "date" if target_type == "datetime" else target_type
+            for column, target_type in value.items()
+        }
+
+    @field_validator("target_type", mode="before")
+    @classmethod
+    def normalize_target_type(cls, value: object) -> object:
+        return "date" if value == "datetime" else value
 
     @model_validator(mode="after")
     def require_conversions(self):
