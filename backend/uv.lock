@@ -19,6 +19,9 @@ wheels = [
 name = "autonomous-data-analysis"
 version = "0.0.1"
 source = { virtual = "." }
+dependencies = [
+    { name = "pydantic" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -37,6 +40,7 @@ docs = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.0" }]
 
 [package.metadata.requires-dev]
 dev = [
