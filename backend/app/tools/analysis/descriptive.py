@@ -1,34 +1,17 @@
 """descriptive_statistics: numeric summaries. Calculations live in this tool, not in an LLM."""
 
-from pathlib import Path
-
 import pandas as pd
 from pydantic import BaseModel, Field
 
 from backend.app.contracts.models import DatasetReference, WarningEvent
+from backend.app.tools.analysis.files import resolve_csv
 from backend.app.tools.registry import Tool, ToolRegistry
 
-BACKEND = Path(__file__).resolve().parents[3]
-ALLOWED = ((BACKEND / "data").resolve(), (BACKEND / "tests" / "fixtures").resolve())
 SRC = "descriptive_statistics"
 
 
 class StatsInput(BaseModel):
     columns: list[str] = Field(min_length=1)
-
-
-def _csv(storage_ref: str) -> Path:
-    raw = Path(storage_ref)
-    candidates = (
-        [raw]
-        if raw.is_absolute()
-        else [root / raw for root in ALLOWED] + [BACKEND / raw]
-    )
-    for candidate in candidates:
-        path = candidate.resolve()
-        if path.is_file() and any(path.is_relative_to(root) for root in ALLOWED):
-            return path
-    raise FileNotFoundError("dataset not found or not allowed")
 
 
 def _num(value: object) -> float | None:
@@ -40,7 +23,7 @@ def _warn(code: str, message: str) -> WarningEvent:
 
 
 def run(dataset: DatasetReference, **kwargs: object) -> dict:
-    frame = pd.read_csv(_csv(dataset.storage_ref))
+    frame = pd.read_csv(resolve_csv(dataset.storage_ref))
     rows = len(frame)
     stats: dict[str, dict[str, float | int | None]] = {}
     warnings: list[WarningEvent] = []
@@ -79,6 +62,11 @@ TOOL = Tool(
 
 
 def default_registry() -> ToolRegistry:
+    from backend.app.tools.analysis.group_aggregate import (
+        TOOL as GROUP_AGGREGATE_TOOL,
+    )
+
     registry = ToolRegistry()
     registry.register(TOOL)
+    registry.register(GROUP_AGGREGATE_TOOL)
     return registry

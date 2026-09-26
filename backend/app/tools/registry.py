@@ -132,11 +132,19 @@ def validate_call(
         parsed = tool.input_model.model_validate(step.arguments)
     except ValidationError as exc:
         return "INVALID_DATA", str(exc)
-    for column in getattr(parsed, "columns", []):
+    for column in getattr(parsed, "group_by", []):
+        if column not in dataset.dataset_schema:
+            return "MISSING_COLUMN", f"Unknown column: {column}"
+
+    columns = list(getattr(parsed, "columns", []) or [])
+    columns.extend(
+        aggregation.column for aggregation in getattr(parsed, "aggregations", [])
+    )
+    for column in columns:
         info = dataset.dataset_schema.get(column)
         if not isinstance(info, dict):
             return "MISSING_COLUMN", f"Unknown column: {column}"
-        if info.get("datatype") not in tool.accepted_dtypes:
+        if tool.accepted_dtypes and info.get("datatype") not in tool.accepted_dtypes:
             allowed = ", ".join(sorted(tool.accepted_dtypes))
             return (
                 "INVALID_DATA",

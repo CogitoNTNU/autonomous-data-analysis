@@ -1,0 +1,5 @@
+region,segment,revenue,units
+North,A,10,1
+North,B,,2
+South,A,30,3
+,A,40,4

@@ -1,14 +1,8 @@
 from backend.app.agents.planner.agent import run_planner
-from backend.app.contracts.errors import AgentError
-from backend.app.contracts.models import (
-    DatasetReference,
-    Plan,
-    PlanStep,
-    PlannerUpdates,
-)
-from backend.app.contracts.responses import AgentResponse
+from backend.app.agents.planner.schema import PlannerOutput
+from backend.app.contracts.models import DatasetReference, Plan, PlanStep
+from backend.app.tools.analysis.group_aggregate import TOOL as GROUP_AGGREGATE_TOOL
 from backend.app.tools.registry import ToolRegistry
-from pydantic import BaseModel
 
 
 def make_dataset() -> DatasetReference:
@@ -34,8 +28,14 @@ def make_valid_plan() -> Plan:
                 step_id="step-1",
                 tool_name="group_aggregate",
                 arguments={
-                    "columns": ["body_mass_g"],
                     "group_by": ["species"],
+                    "aggregations": [
+                        {
+                            "column": "body_mass_g",
+                            "function": "mean",
+                            "alias": "average_body_mass",
+                        }
+                    ],
                 },
                 depends_on=[],
             )
@@ -47,24 +47,7 @@ def make_valid_plan() -> Plan:
 
 def make_registry() -> ToolRegistry:
     registry = ToolRegistry()
-    
-
-    class GroupAggregateInput(BaseModel):
-        columns: list[str]
-        group_by: list[str]
-
-    from backend.app.tools.registry import Tool
-
-    registry.register(
-        Tool(
-            name="group_aggregate",
-            description="Aggregate numeric columns by groups.",
-            input_model=GroupAggregateInput,
-            accepted_dtypes=frozenset({"float", "integer"}),
-            run=lambda dataset, **kwargs: {},
-        )
-    )
-
+    registry.register(GROUP_AGGREGATE_TOOL)
     return registry
 
 
@@ -74,10 +57,7 @@ def test_planner_accepts_valid_plan():
     plan = make_valid_plan()
 
     def fake_model(prompt, context):
-        return AgentResponse(
-            status="success",
-            updates=PlannerUpdates(plan=plan),
-        )
+        return PlannerOutput(plan=plan)
 
     response = run_planner(
         user_query="What is the average body mass for each species?",
@@ -107,10 +87,7 @@ def test_planner_rejects_invalid_plan():
     )
 
     def fake_model(prompt, context):
-        return AgentResponse(
-            status="success",
-            updates=PlannerUpdates(plan=invalid_plan),
-        )
+        return PlannerOutput(plan=invalid_plan)
 
     response = run_planner(
         user_query="Compare penguins.",
