@@ -261,7 +261,10 @@ validate_call(tool_name: str, arguments: dict) -> ValidatedToolCall
 execute(tool_name: str, arguments: dict) -> ToolExecution
 ```
 
-The Planner receives tool definitions but never raw Python callables.
+The Planner is bound to exactly four registered inspection tools:
+`inspect_schema`, `get_metadata`, `preview_data`, and `column_profile`. It may
+call these tools directly through the registry while planning, but it never
+receives raw Python callables.
 
 The registry must reject:
 
@@ -569,7 +572,7 @@ user_query
 dataset
 conversation_context
 critique
-available_tools
+inspection_tools
 ```
 
 Returns:
@@ -582,8 +585,10 @@ clarification_question
 Responsibilities:
 
 - Understand the user’s objective.
-- Inspect available metadata.
-- Select only registered tools.
+- Directly call `inspect_schema`, `get_metadata`, `preview_data`, and
+  `column_profile` as needed to inspect the dataset.
+- Use typed inspection results when constructing or revising the plan.
+- Select only registered preprocessing and analysis tools for plan steps.
 - Create valid preprocessing and analysis steps.
 - Declare required columns.
 - State assumptions explicitly.
@@ -592,9 +597,13 @@ Responsibilities:
 The Planner does not:
 
 - Transform data
-- Calculate statistics
+- Calculate analysis results
 - Produce final answers
-- Execute tools
+- Execute preprocessing, analysis, visualization, or data-modifying tools
+
+The four inspection tools are the Planner’s complete runtime tool set. Every
+call is validated and executed through the ToolRegistry and counts toward the
+workflow tool-execution limit.
 
 Clarification conditions include:
 
@@ -801,6 +810,10 @@ START
   ▼
 Planner
   │
+  ├── inspection required ──► Dataset inspection tool
+  │                                  │
+  │                                  └── typed result ──► Planner
+  │
   ├── clarification required
   │        │
   │        ▼
@@ -834,6 +847,21 @@ Critic
 ---
 
 # 12. Required loops and limits
+
+## Planner inspection loop
+
+```text
+Planner → registered inspection tool → Planner
+```
+
+Rules:
+
+- The Planner decides whether and which inspection tool to call.
+- Only `inspect_schema`, `get_metadata`, `preview_data`, and `column_profile`
+  are available to the Planner.
+- Every call is validated through the ToolRegistry.
+- Inspection results must use typed outputs and respect preview-size limits.
+- Inspection calls count toward the workflow tool-execution limit.
 
 ## Clarification loop
 
@@ -1082,13 +1110,17 @@ Acceptance criteria:
 Implement:
 
 - Planner input/output
-- Available-tool prompt
+- Four bound inspection tools
+- Planner tool-calling loop
 - Structured plan output
 - Clarification output
 - Plan validation
 
 Acceptance criteria:
 
+- Planner can directly call each of the four inspection tools.
+- Planner cannot call preprocessing, analysis, visualization, or unknown tools.
+- Inspection calls and results can be replaced with test doubles.
 - Planner selects only registered tools.
 - Planner asks for clarification on ambiguous requests.
 - Planner cannot return an invalid plan.

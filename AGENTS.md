@@ -214,7 +214,7 @@ Each workflow node only receives access to the tools it needs.
 
 Suggested permissions:
 
-Planner:
+Planner (directly callable, read-only dataset inspection only):
 - inspect_schema
 - get_metadata
 - preview_data
@@ -352,17 +352,24 @@ Each PR should include:
 
 Responsible for:
 - understanding the user's objective
-- inspecting metadata
-- selecting registered tools
+- directly calling `inspect_schema`, `get_metadata`, `preview_data`, and
+  `column_profile` as needed to understand the dataset
+- selecting registered preprocessing and analysis tools for plan steps
 - producing a validated AnalysisPlan
 - declaring assumptions
 - asking for clarification when required
 
 Must not:
 - transform datasets
-- calculate statistics
-- execute tools
+- calculate analysis results
+- execute preprocessing, analysis, or data-modifying tools
 - produce the final answer
+
+These four inspection tools are bound to the Planner as its complete runtime
+tool set. The Planner decides which of them to call and may use their typed
+results while constructing or revising a plan. Every call must still pass
+through ToolRegistry validation and count toward the LangGraph execution
+limits.
 
 ### Preprocessing Executor
 
