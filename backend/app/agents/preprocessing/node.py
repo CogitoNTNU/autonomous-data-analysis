@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 from ...models.dataset import DatasetReference
+from ...models.plan import PlanStep
 from ...models.results import PreprocessingChange
-from ...tools.preprocessing import TOOLS, build_metadata, load_csv, write_csv
+from ...tools.preprocessing_tools import (
+    build_metadata,
+    execute_preprocessing_tool,
+    load_csv,
+    write_csv,
+)
+from .idun import IdunPreprocessingPlanner
 from .schemas import PreprocessingInput, PreprocessingOutput
 
 
@@ -32,12 +39,19 @@ def run_preprocessing(input_data: PreprocessingInput) -> PreprocessingOutput:
     changes: list[PreprocessingChange] = []
     affected_columns: set[str] = set()
     warnings: list[str] = []
-    for step in input_data.steps:
-        tool = TOOLS.get(step.tool_name)
-        if tool is None:
-            raise ValueError(f"Unknown preprocessing tool: {step.tool_name}")
-        execution = tool(rows, step.arguments)
+    made_changes = False
+    for step in _order_steps(input_data.steps):
+        execution = execute_preprocessing_tool(
+            step.tool_name, rows, fieldnames, step.arguments
+        )
         rows = execution.rows
+        if execution.fieldnames is not None:
+            fieldnames = execution.fieldnames
+        made_changes = made_changes or (
+            execution.changed
+            if execution.changed is not None
+            else execution.rows_affected > 0
+        )
         affected_columns.update(execution.affected_columns)
         warnings.extend(execution.quality_warnings)
         changes.append(
@@ -71,13 +85,48 @@ def run_preprocessing(input_data: PreprocessingInput) -> PreprocessingOutput:
             "rows_before": original_row_count,
             "rows_after": len(rows),
             "quality_warnings": warnings,
-            "no_changes": all(change.rows_affected == 0 for change in changes),
+            "no_changes": not made_changes,
         },
     )
 
 
+def _order_steps(steps: list[PlanStep]) -> list[PlanStep]:
+    step_ids = [step.step_id for step in steps]
+    if len(step_ids) != len(set(step_ids)):
+        raise ValueError("Preprocessing step_id values must be unique")
+
+    known_ids = set(step_ids)
+    for step in steps:
+        unknown_dependencies = set(step.depends_on) - known_ids
+        if unknown_dependencies:
+            raise ValueError(
+                f"Step '{step.step_id}' has unknown dependencies: "
+                f"{', '.join(sorted(unknown_dependencies))}"
+            )
+
+    pending = list(steps)
+    ordered = []
+    completed: set[str] = set()
+    while pending:
+        ready = [step for step in pending if set(step.depends_on) <= completed]
+        if not ready:
+            raise ValueError("Preprocessing plan contains a dependency cycle")
+        for step in ready:
+            ordered.append(step)
+            completed.add(step.step_id)
+            pending.remove(step)
+    return ordered
+
+
 class PreprocessingAgent:
-    """Compatibility facade for callers using the agent object interface."""
+    """Offer optional model planning and deterministic step execution."""
+
+    def __init__(self, planner: IdunPreprocessingPlanner | None = None) -> None:
+        self._planner = planner if planner is not None else IdunPreprocessingPlanner()
+
+    def plan(self, dataset: DatasetReference, request: str) -> list[PlanStep]:
+        """Ask Idun for candidate steps; inspect them before calling ``run``."""
+        return self._planner.plan(dataset, request)
 
     def run(self, dataset, steps=()) -> PreprocessingOutput:
         # Keep the original object API while the package uses a node function.

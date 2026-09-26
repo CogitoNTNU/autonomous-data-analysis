@@ -43,11 +43,19 @@ For an empty plan, the agent:
 8. Sets `no_changes` to `true`.
 9. Returns the result using Pydantic models.
 
-For a non-empty CSV plan, the agent executes registered tools in the order
-provided by the plan. The current tools are `handle_missing_values` with
-`drop_rows` or `fill` strategies, `convert_types` for integer, float, string,
-or boolean values, and `remove_duplicates` with optional key columns. Unknown
-tools, columns, strategies, and invalid conversions are rejected.
+For a non-empty CSV plan, the agent validates registered tool arguments and
+executes steps in dependency order. The nine canonical tools are
+`handle_missing_values`, `remove_duplicates`, `change_datatypes`,
+`encode_categorical`, `scale_features`, `filter_rows`, `select_columns`,
+`normalize_values`, and `handle_outliers`.
+Unknown tools, columns, invalid arguments, unsupported conversions, missing
+dependencies, and dependency cycles are rejected.
+
+Datatype conversion supports integer, float, string, boolean, date, and
+currency values. Numeric conversion recognizes common currency symbols and
+comma/dot separators; date conversion accepts common formats including
+day-first numeric dates. `normalize_values` trims and collapses whitespace,
+applies case rules, and supports explicit case-insensitive value maps.
 
 Each non-empty run writes a derived CSV, creates a new content-addressed
 dataset version, and records the input version as its parent. The raw input
@@ -56,9 +64,21 @@ file is never overwritten.
 ## File Structure
 
 ```text
+backend/app/tools/
+├── preprocessing.py                 # Backward-compatible public exports
+└── preprocessing_tools/
+    ├── core.py                       # Shared contracts, schemas, constants
+    ├── cleaning.py                   # Missing values, normalization, types
+    ├── row_operations.py              # Filtering, duplicate/column selection
+    ├── features.py                    # Encoding, scaling, outlier handling
+    ├── csv_dataset.py                 # CSV I/O and metadata
+    ├── registry.py                    # Validated dispatch and tool registry
+    └── __init__.py                    # Public exports
+
 backend/app/agents/preprocessing/
 ├── __init__.py
 ├── README.md
+├── idun.py
 ├── node.py
 ├── prompt.md
 └── schemas.py
@@ -81,9 +101,9 @@ backend/tests/
 
 ### `prompt.md`
 
-Contains the behavior instructions for a future model-backed preprocessing
-agent. It defines the role boundary, dataset immutability rules, permitted
-operations, error behavior, output contract, and final verification checklist.
+Contains the behavior instructions for the Idun-backed plan generator. It
+defines the role boundary and argument contracts for each registered
+preprocessing operation.
 
 The prompt explicitly states that:
 
@@ -94,8 +114,7 @@ The prompt explicitly states that:
 - the harness controls workflow behavior;
 - outputs must conform to `PreprocessingOutput`.
 
-The prompt is instruction text. It is not executed by the current deterministic
-node.
+The model proposes steps only; the local executor validates and runs them.
 
 ### `schemas.py`
 
@@ -123,6 +142,18 @@ class PreprocessingOutput(BaseModel):
     processed_dataset: DatasetReference
     report: PreprocessingReport
 ```
+
+### Tool module ownership
+
+Put shared argument schemas and low-level validation in
+`backend/app/tools/preprocessing_tools/core.py`. Add a transformation to the
+closest domain module (`cleaning.py`, `row_operations.py`, or `features.py`),
+then register its argument model and callable in `registry.py` and export it
+from `preprocessing_tools/__init__.py`. Keep file loading, derived CSV writing,
+hashing, and metadata inference in `csv_dataset.py`.
+
+`backend/app/tools/preprocessing.py` remains as a compatibility facade for
+older imports. New internal code should import from `preprocessing_tools`.
 
 ### `node.py`
 
@@ -165,9 +196,9 @@ version, and metadata.
 Contains the shared `PlanStep` contract. A step identifies a tool, its
 arguments, and any dependencies.
 
-The preprocessing node receives these steps but does not currently execute
-non-empty steps because the tool registry and transformation tools are not yet
-part of this implementation.
+The deterministic node executes registered steps through the local CSV tools.
+The optional Idun planner proposes steps from a request and dataset schema;
+callers can inspect them before passing them to `PreprocessingAgent.run`.
 
 ### `backend/app/models/results.py`
 
@@ -254,8 +285,9 @@ PlanStep(
 )
 ```
 
-Dependency graph validation and tool argument validation belong to the plan
-validation and registry layers. They are not duplicated inside the no-op node.
+The executor rejects duplicate step IDs, unknown dependencies, and cycles. It
+executes valid steps in dependency order, validates tool arguments with
+Pydantic models, and propagates updated column names between steps.
 
 ### Preprocessing report
 
@@ -285,6 +317,25 @@ from backend.app.agents.preprocessing import PreprocessingAgent
 
 result = PreprocessingAgent().run(dataset, steps=[])
 ```
+
+### Idun planning
+
+Set `IDUN_API_KEY` in the shell and optionally set `IDUN_MODEL` or
+`IDUN_BASE_URL`. The defaults are `openai/gpt-oss-120b` and
+`https://llm.hpc.ntnu.no/v1`.
+
+```python
+from backend.app.agents.preprocessing import PreprocessingAgent
+
+agent = PreprocessingAgent()
+steps = agent.plan(dataset, "Drop rows missing bill_length_mm or sex.")
+# Inspect or approve the proposed PlanStep list before execution.
+result = agent.run(dataset, steps)
+```
+
+The planner sends column names and aggregate metadata, not CSV rows. Only the
+registered preprocessing tool names are accepted, and execution stays local.
+The plan request requires NTNU network or VPN access.
 
 ### Node-style API
 
@@ -326,8 +377,11 @@ It covers:
 2. The input and output versions remain equal.
 3. Row counts remain unchanged.
 4. No changes are recorded for an empty plan.
-5. Non-empty plans are rejected until tools exist.
-6. The typed node input produces a typed output.
+5. Each canonical preprocessing tool is exercised against a CSV.
+6. Transformations that add or remove columns propagate their headers.
+7. Source files remain unchanged and results use derived dataset versions.
+8. Dependency ordering and invalid plans are checked.
+9. Mocked Idun tool calls produce validated steps without sending CSV row data.
 
 The intended test command from the repository documentation is:
 
@@ -335,117 +389,42 @@ The intended test command from the repository documentation is:
 uv run --project backend pytest backend/tests
 ```
 
-The local environment used during implementation did not have `uv` or
-`pytest` available, so the focused test suite could not be run there. The
-following checks did pass:
+To call Idun as part of the opt-in live integration test, first export
+`IDUN_API_KEY`, then run:
 
 ```bash
-python3 -m compileall -q \
-  backend/app/agents/preprocessing \
-  backend/tests/test_preprocessing_agent.py
+RUN_IDUN_INTEGRATION=1 uv run --project backend pytest \
+    backend/tests/test_preprocessing_agent.py -k idun -q
 ```
 
-A direct runtime smoke test also passed for:
-
-- importing the preprocessing package;
-- constructing a `DatasetReference`;
-- executing an empty preprocessing plan;
-- preserving the dataset reference;
-- returning `no_changes=True`;
-- rejecting a non-empty unsupported step.
-
-Editor diagnostics reported no errors in the preprocessing node, schemas, or
-tests.
+The normal test suite does not call Idun. The live request is opt-in and
+requires `IDUN_API_KEY`, NTNU network access or VPN, and
+`RUN_IDUN_INTEGRATION=1`.
 
 ## Dependency Note
 
-`pydantic>=2.0` was added to `backend/pyproject.toml` because the shared and
-agent-specific contracts use Pydantic models.
+`pydantic>=2.0` provides the shared and agent-specific data contracts.
+`openai>=1.0` provides the OpenAI-compatible Idun API client.
 
-The repository declares Python 3.12 or newer. The available local `python3`
-interpreter was older, so optional annotations in the shared models use a
-compatibility-friendly form where needed.
+The repository declares Python 3.12 or newer.
 
 ## What This Does Not Implement Yet
 
-The following are intentionally outside the current milestone:
+The following are outside this preprocessing-agent milestone:
 
-- tool registry integration;
-- `handle_missing_values`;
-- `remove_duplicates`;
-- `change_datatypes`;
-- `filter_rows`;
-- `select_columns`;
-- dataset file reading and writing;
-- content-hash generation for processed data;
-- processed dataset version generation;
-- persistent dataset storage;
-- artifact storage;
 - LangGraph node registration;
 - retries and checkpointing;
-- preprocessing failure models;
 - API endpoints;
-- model calls.
+- human approval UI for proposed plans.
 
-Do not add these implicitly to the no-op node. They should be introduced as
-separate, tested changes behind explicit interfaces.
+Idun proposes plans only. The caller remains responsible for reviewing the
+steps before passing them to the deterministic executor.
 
-## Recommended Next Implementation Steps
+## Remaining Work
 
-When the team is ready to continue preprocessing, use this order:
-
-### 1. Confirm shared contracts
-
-Coordinate with whoever owns Phase 1. Avoid creating duplicate versions of
-`DatasetReference`, `PlanStep`, and `PreprocessingReport`. Adapt imports if the
-team's final shared model locations or field names change.
-
-### 2. Add the tool interface and registry
-
-The node should receive a registry abstraction rather than importing concrete
-transformation functions directly. The registry must validate:
-
-- tool name;
-- input arguments;
-- approved dataset access;
-- output type;
-- dependency behavior.
-
-### 3. Add dataset storage
-
-Introduce a `DatasetStore` abstraction with operations for reading references,
-saving processed versions, and verifying hashes. The raw file must remain
-untouched.
-
-### 4. Implement one transformation at a time
-
-Recommended first tool: `remove_duplicates` or
-`handle_missing_values`. Each tool should have:
-
-- an input model;
-- an output model;
-- deterministic execution;
-- a new dataset version;
-- a `PreprocessingChange` record;
-- warnings where relevant;
-- success and failure tests.
-
-### 5. Execute dependencies explicitly
-
-Replace the current empty-plan guard with dependency ordering only after the
-registry and tool contracts exist. A failed dependency must prevent downstream
-steps from running.
-
-### 6. Add failure contracts
-
-Use structured errors that identify the node, step, category, message, and
-retryability. Keep stack traces and storage paths out of user-facing output.
-
-### 7. Integrate with LangGraph
-
-Register the preprocessing node with the harness only after its standalone
-contract tests pass. LangGraph should own routing, retries, step limits, and
-checkpointing.
+- Register the preprocessing node in the LangGraph workflow.
+- Add a user-facing approval step before running model-proposed plans.
+- Replace local derived-file storage with persistent dataset storage if needed.
 
 ## Ownership and Non-Overlap Checklist
 
@@ -454,6 +433,7 @@ This work should be considered preprocessing-specific when reviewing changes.
 ### Files owned by this work
 
 - `backend/app/agents/preprocessing/prompt.md`
+- `backend/app/agents/preprocessing/idun.py`
 - `backend/app/agents/preprocessing/node.py`
 - `backend/app/agents/preprocessing/schemas.py`
 - `backend/app/agents/preprocessing/__init__.py`
@@ -486,12 +466,11 @@ The preprocessing package now has the requested agent shape:
 
 ```text
 preprocessing/
-├── prompt.md   # behavior and boundaries
+├── prompt.md   # Idun plan-generation instructions
+├── idun.py     # API client and validated plan generation
 ├── node.py     # deterministic execution entry point
 └── schemas.py  # typed input and output
 ```
 
-It is safe to use for the no-op Phase 4 contract. It is not yet a general
-preprocessing engine. The next contributor should add registered transformation
-tools and dataset version storage without changing the agent's ownership
-boundary or silently mutating raw data.
+Idun proposes plans only. Callers can inspect `PlanStep`s and then pass them to
+the deterministic executor; the source CSV is never overwritten.
