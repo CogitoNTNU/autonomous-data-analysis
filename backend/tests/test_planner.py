@@ -1,12 +1,10 @@
 from backend.app.agents.planner.agent import run_planner
-from backend.app.contracts.errors import AgentError
+from backend.app.agents.planner.schema import PlannerOutput
 from backend.app.contracts.models import (
     DatasetReference,
     Plan,
     PlanStep,
-    PlannerUpdates,
 )
-from backend.app.contracts.responses import AgentResponse
 from backend.app.tools.registry import ToolRegistry
 from pydantic import BaseModel
 
@@ -47,7 +45,6 @@ def make_valid_plan() -> Plan:
 
 def make_registry() -> ToolRegistry:
     registry = ToolRegistry()
-    
 
     class GroupAggregateInput(BaseModel):
         columns: list[str]
@@ -74,13 +71,15 @@ def test_planner_accepts_valid_plan():
     plan = make_valid_plan()
 
     def fake_model(prompt, context):
-        return AgentResponse(
-            status="success",
-            updates=PlannerUpdates(plan=plan),
-        )
+        return PlannerOutput(plan=plan)
 
     response = run_planner(
-        user_query="What is the average body mass for each species?",
+        user_query=(
+            "Before creating the analysis plan, inspect the body_mass_g column "
+            "using the column_profile tool. Then create a plan for descriptive "
+            "statistics. Include the observed minimum and maximum from the "
+            "inspection in the plan assumptions."
+        ),
         dataset=dataset,
         conversation_context=[],
         critique=None,
@@ -107,10 +106,7 @@ def test_planner_rejects_invalid_plan():
     )
 
     def fake_model(prompt, context):
-        return AgentResponse(
-            status="success",
-            updates=PlannerUpdates(plan=invalid_plan),
-        )
+        return PlannerOutput(plan=invalid_plan)
 
     response = run_planner(
         user_query="Compare penguins.",

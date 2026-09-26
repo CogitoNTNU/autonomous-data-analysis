@@ -1,9 +1,13 @@
 import pytest
 
 from backend.app.storage.datasets import create_dataset_reference
-from backend.app.tools.dataset.inspection import preview_data, get_metadata, inspect_schema
+from backend.app.tools.dataset.inspection import (
+    column_profile,
+    get_metadata,
+    inspect_schema,
+    preview_data,
+)
 from backend.app.tools.inspect_dataset import DEFAULT_DATASET, inspect_dataset
-
 
 
 def test_inspect_example_dataset():
@@ -13,6 +17,7 @@ def test_inspect_example_dataset():
     assert result["number_of_rows"] == 344
     assert result["missing_values"] == 19
     assert result["duplicate_rows"] == 0
+
 
 # get_metadata tests
 def test_get_metadata_returns_dataset_counts():
@@ -33,10 +38,7 @@ def test_get_metadata_returns_all_columns():
 
     assert len(result["columns"]) == 8
 
-    column_names = [
-        column["name"]
-        for column in result["columns"]
-    ]
+    column_names = [column["name"] for column in result["columns"]]
 
     assert column_names == [
         "species",
@@ -102,6 +104,7 @@ def test_preview_data_rejects_unknown_columns():
             limit=3,
         )
 
+
 def test_preview_data_rejects_limit_above_maximum():
     dataset = create_dataset_reference(DEFAULT_DATASET)
 
@@ -111,6 +114,7 @@ def test_preview_data_rejects_limit_above_maximum():
             columns=None,
             limit=21,
         )
+
 
 def test_preview_data_rejects_limit_below_minimum():
     dataset = create_dataset_reference(DEFAULT_DATASET)
@@ -123,7 +127,7 @@ def test_preview_data_rejects_limit_below_minimum():
         )
 
 
-# tests for inspect_dataset function
+# inspect_schema tests
 def test_inspect_schema_returns_metadata():
     dataset = create_dataset_reference(DEFAULT_DATASET)
 
@@ -143,3 +147,33 @@ def test_inspect_schema_returns_warnings():
     result = inspect_schema(dataset)
 
     assert result["warnings"] == []
+
+
+# column_profile tests
+def test_column_profile_returns_numeric_statistics():
+    dataset = create_dataset_reference(DEFAULT_DATASET)
+
+    result = column_profile(
+        dataset,
+        column="body_mass_g",
+    )
+
+    assert result["data_type"] == "float64"
+    assert result["missing_count"] == 2
+    assert result["unique_count"] == 94
+    assert result["minimum"] == 2700.0
+    assert result["maximum"] == 6300.0
+    assert result["mean"] is not None
+    assert result["quantiles"] is not None
+    assert result["top_values"]
+    assert result["warnings"] == []
+
+
+def test_column_profile_rejects_unknown_column():
+    dataset = create_dataset_reference(DEFAULT_DATASET)
+
+    with pytest.raises(ValueError):
+        column_profile(
+            dataset,
+            column="does_not_exist",
+        )
