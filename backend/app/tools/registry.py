@@ -137,6 +137,9 @@ def validate_call(
             return "MISSING_COLUMN", f"Unknown column: {column}"
 
     columns = list(getattr(parsed, "columns", []) or [])
+    column = getattr(parsed, "column", None)
+    if isinstance(column, str):
+        columns.append(column)
     columns.extend(
         aggregation.column for aggregation in getattr(parsed, "aggregations", [])
     )
