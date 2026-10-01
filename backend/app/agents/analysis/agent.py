@@ -24,10 +24,12 @@ SOURCE = "analysis"
 def _registry(registry: ToolRegistry | None) -> ToolRegistry:
     if registry is not None:
         return registry
+    from backend.app.tools.analysis.categorical import TOOL as CATEGORICAL
     from backend.app.tools.analysis.descriptive import default_registry
     from backend.app.tools.visualization.catalog import register_visualization
 
     active = default_registry()
+    active.register(CATEGORICAL)  # kategorier kjøres herfra, sammen med analysen
     register_visualization(active)  # diagrammene kjøres herfra, sammen med analysen
     return active
 
