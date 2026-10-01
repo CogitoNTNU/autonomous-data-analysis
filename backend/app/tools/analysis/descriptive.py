@@ -79,6 +79,8 @@ TOOL = Tool(
 
 
 def default_registry() -> ToolRegistry:
+    from backend.app.tools.analysis.categorical import register_categorical
+
     registry = ToolRegistry()
     registry.register(TOOL)
-    return registry
+    return register_categorical(registry)
