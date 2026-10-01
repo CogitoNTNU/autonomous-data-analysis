@@ -51,6 +51,9 @@ def _print_state(state: AgentState) -> None:
     pprint(report.model_dump() if report else None)
     print("\nANALYSIS RESULTS")
     pprint([result.model_dump() for result in state["analysis_results"]])
+    if state["artifacts"]:
+        print("\nARTIFACTS")
+        pprint([artifact.model_dump() for artifact in state["artifacts"]])
     if state["warnings"]:
         print("\nWARNINGS")
         pprint([warning.model_dump() for warning in state["warnings"]])
