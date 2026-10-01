@@ -167,3 +167,46 @@ def test_analysis_rejects_unknown_source_result(tmp_path, monkeypatch):
     assert "source_result_id" in result.values["error"]
     assert engine.response.updates.artifacts == []
     assert list(tmp_path.glob("*.png")) == []
+
+
+def test_bar_chart_consumes_group_aggregate_output(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "backend.app.tools.visualization.figure.DEFAULT_ARTIFACTS", tmp_path
+    )
+    engine = run_analysis(
+        _dataset(),
+        [
+            PlanStep(
+                step_id="aggregate",
+                tool_name="group_aggregate",
+                arguments={
+                    "group_by": ["city"],
+                    "aggregations": [
+                        {
+                            "column": "sales",
+                            "function": "mean",
+                            "alias": "mean_sales",
+                        }
+                    ],
+                },
+            ),
+            PlanStep(
+                step_id="draw",
+                tool_name="bar_chart",
+                arguments={
+                    "title": "Average sales by city",
+                    "x": "city",
+                    "y": "mean_sales",
+                    "source_result_id": "aggregate",
+                },
+                depends_on=["aggregate"],
+            ),
+        ],
+    )
+
+    aggregate, chart = engine.response.updates.analysis_results
+    assert aggregate.values["status"] == "partial"
+    assert chart.values["status"] == "partial"
+    assert chart.values["source_result_ids"] == [aggregate.result_id]
+    artifact = engine.response.updates.artifacts[0]
+    assert Path(artifact.storage_ref).read_bytes().startswith(b"\x89PNG")

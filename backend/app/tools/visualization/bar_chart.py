@@ -8,14 +8,19 @@ from backend.app.contracts.models import DatasetReference
 from backend.app.tools.registry import Tool
 from backend.app.tools.visualization.figure import save_chart
 from backend.app.tools.visualization.inputs import DTYPES, ChartInput, parse_chart
-from backend.app.tools.visualization.load import failed, prepare_numeric, read_dataset
+from backend.app.tools.visualization.load import (
+    failed,
+    prepare_numeric,
+    read_dataset,
+    runtime_source_rows,
+)
 
 
 def run(
     dataset: DatasetReference, output_dir: Path | None = None, **kwargs: object
 ) -> dict[str, object]:
     spec = parse_chart(ChartInput, kwargs)
-    loaded = _frame(dataset, spec)
+    loaded = _frame(dataset, spec, runtime_source_rows(kwargs))
     if isinstance(loaded, dict):
         return loaded
     table = _table(loaded, spec)
@@ -25,14 +30,16 @@ def run(
 
 
 def _frame(
-    dataset: DatasetReference, spec: ChartInput
+    dataset: DatasetReference,
+    spec: ChartInput,
+    source_rows: list[dict[str, object]] | None,
 ) -> pd.DataFrame | dict[str, object]:
     if spec.y is None:
-        frame = read_dataset(dataset)
+        frame = read_dataset(dataset, source_rows)
         if len(frame) == 0:
             return failed("INSUFFICIENT_DATA", "no rows")
         return frame
-    return prepare_numeric(dataset, [spec.y])
+    return prepare_numeric(dataset, [spec.y], source_rows)
 
 
 def _table(frame: pd.DataFrame, spec: ChartInput) -> pd.Series | pd.DataFrame:
@@ -47,7 +54,11 @@ def _table(frame: pd.DataFrame, spec: ChartInput) -> pd.Series | pd.DataFrame:
 
 TOOL = Tool(
     name="bar_chart",
-    description="Bar chart of counts, or mean of y, for each x. Optional: y, group.",
+    description=(
+        "Bar chart of counts, or mean of y, for each x. Optional: y, group. "
+        "Columns must come from the active dataset or a depended-on "
+        "group_aggregate result."
+    ),
     input_model=ChartInput,
     accepted_dtypes=DTYPES,
     run=run,

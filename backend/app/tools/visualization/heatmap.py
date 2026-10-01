@@ -9,14 +9,18 @@ from backend.app.contracts.models import DatasetReference
 from backend.app.tools.registry import Tool
 from backend.app.tools.visualization.figure import save_chart
 from backend.app.tools.visualization.inputs import DTYPES, AxesInput, parse_chart
-from backend.app.tools.visualization.load import failed, read_dataset
+from backend.app.tools.visualization.load import (
+    failed,
+    read_dataset,
+    runtime_source_rows,
+)
 
 
 def run(
     dataset: DatasetReference, output_dir: Path | None = None, **kwargs: object
 ) -> dict[str, object]:
     spec = parse_chart(AxesInput, kwargs)
-    frame = read_dataset(dataset)
+    frame = read_dataset(dataset, runtime_source_rows(kwargs))
     if len(frame) == 0:
         return failed("INSUFFICIENT_DATA", "no rows")
     # antall rader i hvert x/y-par, ikke en tredje verdikolonne

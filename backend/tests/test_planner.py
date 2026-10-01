@@ -5,6 +5,7 @@ from backend.app.contracts.models import (
     Plan,
     PlanStep,
 )
+from backend.app.tools.analysis.descriptive import default_registry
 from backend.app.tools.analysis.group_aggregate import TOOL as GROUP_AGGREGATE_TOOL
 from backend.app.tools.registry import ToolRegistry
 
@@ -110,3 +111,66 @@ def test_planner_rejects_invalid_plan():
     assert response.status == "error"
     assert response.error is not None
     assert response.error.code == "INVALID_OUTPUT"
+
+
+def test_planner_accepts_chart_of_group_aggregate_output():
+    plan = make_valid_plan().model_copy(
+        update={
+            "analysis_steps": [
+                *make_valid_plan().analysis_steps,
+                PlanStep(
+                    step_id="step-2",
+                    tool_name="bar_chart",
+                    arguments={
+                        "title": "Average body mass by species",
+                        "x": "species",
+                        "y": "average_body_mass",
+                    },
+                    depends_on=["step-1"],
+                ),
+            ]
+        }
+    )
+
+    response = run_planner(
+        user_query="Calculate and chart average body mass by species.",
+        dataset=make_dataset(),
+        conversation_context=[],
+        critique=None,
+        registry=default_registry(),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "success"
+
+
+def test_planner_rejects_derived_chart_column_without_dependency():
+    plan = make_valid_plan().model_copy(
+        update={
+            "analysis_steps": [
+                *make_valid_plan().analysis_steps,
+                PlanStep(
+                    step_id="step-2",
+                    tool_name="bar_chart",
+                    arguments={
+                        "title": "Average body mass by species",
+                        "x": "species",
+                        "y": "average_body_mass",
+                    },
+                ),
+            ]
+        }
+    )
+
+    response = run_planner(
+        user_query="Calculate and chart average body mass by species.",
+        dataset=make_dataset(),
+        conversation_context=[],
+        critique=None,
+        registry=default_registry(),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert "average_body_mass" in response.error.message

@@ -44,9 +44,7 @@ class Tool:
     accepted_dtypes: frozenset[str]
     run: Callable[..., dict[str, Any]]
     phase: ToolPhase = "analysis"
-    update_schema: Callable[
-        [dict[str, Any], BaseModel], dict[str, Any]
-    ] | None = None
+    update_schema: Callable[[dict[str, Any], BaseModel], dict[str, Any]] | None = None
 
 
 class ToolRegistry:
@@ -82,6 +80,7 @@ def execute_step(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     artifacts: list[Artifact] | None = None,
     log: list[str] | None = None,
+    runtime_arguments: dict[str, Any] | None = None,
 ) -> AnalysisResult:
     tool = registry.get(step.tool_name)
     if tool is None:
@@ -97,7 +96,7 @@ def execute_step(
     if problem:
         return fail(step, dataset, *problem)
     key = cache_key(step, dataset)
-    if cache is not None and key in cache:
+    if runtime_arguments is None and cache is not None and key in cache:
         if log is not None:
             log.append(f"cache {step.step_id}")
         cached = cache[key]
@@ -105,6 +104,7 @@ def execute_step(
             update={"result_id": str(uuid4()), "step_id": step.step_id}
         )
     kwargs = dict(step.arguments)
+    kwargs.update(runtime_arguments or {})
     kwargs.setdefault("random_state", DEFAULT_RANDOM_STATE)
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
@@ -118,7 +118,7 @@ def execute_step(
             "TIMEOUT",
             f"Tool {step.tool_name} exceeded the {timeout_seconds:.1f}s step budget",
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - tool failures become structured results
         return fail(step, dataset, "TOOL_FAILURE", str(exc) or type(exc).__name__)
     raw_artifacts = payload.pop("artifacts", [])
     if artifacts is not None:
@@ -133,7 +133,7 @@ def execute_step(
         sample if isinstance(sample, int) and sample >= 0 else 0,
         warnings,
     )
-    if cache is not None:
+    if runtime_arguments is None and cache is not None:
         cache[key] = outcome
     return outcome
 
