@@ -1,5 +1,3 @@
-from pydantic import BaseModel
-
 from backend.app.agents.planner.node import planner_node
 from backend.app.agents.planner.schema import (
     ClarificationRequest,
@@ -11,7 +9,8 @@ from backend.app.contracts.models import (
     PlanStep,
 )
 from backend.app.contracts.state import create_initial_state
-from backend.app.tools.registry import Tool, ToolRegistry
+from backend.app.tools.analysis.group_aggregate import TOOL as GROUP_AGGREGATE_TOOL
+from backend.app.tools.registry import ToolRegistry
 
 
 def make_dataset() -> DatasetReference:
@@ -27,22 +26,8 @@ def make_dataset() -> DatasetReference:
 
 
 def make_registry() -> ToolRegistry:
-    class GroupAggregateInput(BaseModel):
-        columns: list[str]
-        group_by: list[str]
-
     registry = ToolRegistry()
-
-    registry.register(
-        Tool(
-            name="group_aggregate",
-            description="Aggregate numeric columns by groups.",
-            input_model=GroupAggregateInput,
-            accepted_dtypes=frozenset({"float", "integer"}),
-            run=lambda dataset, **kwargs: {},
-        )
-    )
-
+    registry.register(GROUP_AGGREGATE_TOOL)
     return registry
 
 
@@ -57,8 +42,14 @@ def make_plan() -> Plan:
                 step_id="step-1",
                 tool_name="group_aggregate",
                 arguments={
-                    "columns": ["body_mass_g"],
                     "group_by": ["species"],
+                    "aggregations": [
+                        {
+                            "column": "body_mass_g",
+                            "function": "mean",
+                            "alias": "average_body_mass",
+                        }
+                    ],
                 },
                 depends_on=[],
             )

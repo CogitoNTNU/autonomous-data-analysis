@@ -145,11 +145,14 @@ def validate_call(
         parsed = tool.input_model.model_validate(step.arguments)
     except ValidationError as exc:
         return "INVALID_DATA", str(exc)
-    for column in _referenced_columns(parsed):
+    referenced_columns = _referenced_columns(parsed)
+    for column in referenced_columns:
         info = dataset.dataset_schema.get(column)
         if not isinstance(info, dict):
             return "MISSING_COLUMN", f"Unknown column: {column}"
-        if info.get("datatype") not in tool.accepted_dtypes:
+    for column in _dtype_checked_columns(parsed, referenced_columns):
+        info = dataset.dataset_schema[column]
+        if tool.accepted_dtypes and info.get("datatype") not in tool.accepted_dtypes:
             allowed = ", ".join(sorted(tool.accepted_dtypes))
             return (
                 "INVALID_DATA",
@@ -165,7 +168,7 @@ def _referenced_columns(parsed: BaseModel) -> list[str]:
         columns.add(plural_columns)
     elif plural_columns:
         columns.update(plural_columns)
-    for attribute in ("column", "subset"):
+    for attribute in ("column", "subset", "group_by"):
         value = getattr(parsed, attribute, None)
         if isinstance(value, str):
             columns.add(value)
@@ -178,7 +181,26 @@ def _referenced_columns(parsed: BaseModel) -> list[str]:
         condition_column = getattr(condition, "column", None)
         if isinstance(condition_column, str):
             columns.add(condition_column)
+    for aggregation in getattr(parsed, "aggregations", None) or []:
+        aggregation_column = getattr(aggregation, "column", None)
+        if isinstance(aggregation_column, str):
+            columns.add(aggregation_column)
     return sorted(columns)
+
+
+def _dtype_checked_columns(
+    parsed: BaseModel, referenced_columns: list[str]
+) -> list[str]:
+    aggregations = getattr(parsed, "aggregations", None)
+    if aggregations is None:
+        return referenced_columns
+    return sorted(
+        {
+            aggregation.column
+            for aggregation in aggregations
+            if isinstance(getattr(aggregation, "column", None), str)
+        }
+    )
 
 
 def order_steps(steps: list[PlanStep]) -> list[str]:
