@@ -21,6 +21,17 @@ from backend.app.tools.registry import (
 SOURCE = "analysis"
 
 
+def _registry(registry: ToolRegistry | None) -> ToolRegistry:
+    if registry is not None:
+        return registry
+    from backend.app.tools.analysis.descriptive import default_registry
+    from backend.app.tools.visualization.catalog import register_visualization
+
+    active = default_registry()
+    register_visualization(active)  # diagrammene kjøres herfra, sammen med analysen
+    return active
+
+
 def run_analysis(
     processed_dataset: DatasetReference,
     analysis_steps: list[PlanStep],
@@ -28,9 +39,7 @@ def run_analysis(
     registry: ToolRegistry | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> EngineResult:
-    from backend.app.tools.analysis.descriptive import default_registry
-
-    active = registry or default_registry()
+    active = _registry(registry)
     log: list[str] = []
     if preprocessing_report is not None:
         log.append(
