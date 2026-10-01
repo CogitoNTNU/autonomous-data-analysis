@@ -174,3 +174,42 @@ def test_planner_rejects_derived_chart_column_without_dependency():
     assert response.status == "error"
     assert response.error is not None
     assert "average_body_mass" in response.error.message
+
+
+def test_planner_accepts_date_axis_with_numeric_measure():
+    dataset = DatasetReference(
+        dataset_id="sales",
+        version="v1",
+        storage_ref="data/sales.csv",
+        schema={
+            "Transaction Date": {"datatype": "date"},
+            "Total Spent": {"datatype": "float"},
+        },
+    )
+    plan = Plan(
+        plan_id="sales-over-time",
+        objective="Show spending over time.",
+        required_columns=["Transaction Date", "Total Spent"],
+        analysis_steps=[
+            PlanStep(
+                step_id="draw-line",
+                tool_name="line_chart",
+                arguments={
+                    "title": "Spending over time",
+                    "x": "Transaction Date",
+                    "y": "Total Spent",
+                },
+            )
+        ],
+    )
+
+    response = run_planner(
+        user_query="Chart spending over time.",
+        dataset=dataset,
+        conversation_context=[],
+        critique=None,
+        registry=default_registry(),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "success"

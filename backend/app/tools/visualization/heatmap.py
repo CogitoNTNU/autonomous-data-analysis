@@ -8,7 +8,11 @@ from matplotlib.axes import Axes
 from backend.app.contracts.models import DatasetReference
 from backend.app.tools.registry import Tool
 from backend.app.tools.visualization.figure import save_chart
-from backend.app.tools.visualization.inputs import DTYPES, AxesInput, parse_chart
+from backend.app.tools.visualization.inputs import (
+    NUMERIC_DTYPES,
+    AxesInput,
+    parse_chart,
+)
 from backend.app.tools.visualization.load import (
     failed,
     read_dataset,
@@ -41,6 +45,6 @@ TOOL = Tool(
     name="heatmap",
     description="Heatmap of row counts for each x and y pair. Required: x, y.",
     input_model=AxesInput,
-    accepted_dtypes=DTYPES,
+    accepted_dtypes=NUMERIC_DTYPES,
     run=run,
 )

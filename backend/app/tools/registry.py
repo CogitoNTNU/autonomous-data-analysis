@@ -191,6 +191,9 @@ def _referenced_columns(parsed: BaseModel) -> list[str]:
 def _dtype_checked_columns(
     parsed: BaseModel, referenced_columns: list[str]
 ) -> list[str]:
+    numeric_columns = getattr(parsed, "numeric_columns", None)
+    if numeric_columns is not None:
+        return sorted(numeric_columns)
     aggregations = getattr(parsed, "aggregations", None)
     if aggregations is None:
         return referenced_columns

@@ -81,6 +81,29 @@ def test_heatmap_requires_y():
     assert result.values["code"] == "INVALID_DATA"
 
 
+def test_line_chart_rejects_date_measure_before_execution():
+    dataset = _dataset().model_copy(
+        update={
+            "dataset_schema": {
+                **SCHEMA,
+                "date": {"datatype": "date"},
+            }
+        }
+    )
+    result = execute_step(
+        PlanStep(
+            step_id="draw",
+            tool_name="line_chart",
+            arguments={"title": "Invalid", "x": "month", "y": "date"},
+        ),
+        dataset,
+        default_registry(),
+    )
+
+    assert result.values["code"] == "INVALID_DATA"
+    assert "date has dtype date" in result.values["error"]
+
+
 def test_bar_chart_rejects_a_string_measure(tmp_path):
     payload = run_bar(
         _dataset(), output_dir=tmp_path, title="Sales", x="month", y="city"
