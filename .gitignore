@@ -271,6 +271,9 @@ storybook-static/
 # Lerna
 lerna-debug.log
 
+# Generated chart files
+backend/data/artifacts/*.png
+
 # System Files
 .DS_Store
 ._*

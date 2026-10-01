@@ -15,6 +15,7 @@ from backend.app.tools.registry import (
     DEFAULT_TIMEOUT_SECONDS,
     ToolRegistry,
     execute_step,
+    fail,
     order_steps,
 )
 
@@ -28,9 +29,10 @@ def run_analysis(
     registry: ToolRegistry | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> EngineResult:
-    from backend.app.tools.analysis.descriptive import default_registry
+    if registry is None:
+        from backend.app.tools.analysis.descriptive import default_registry
 
-    active = registry or default_registry()
+        registry = default_registry()
     log: list[str] = []
     if preprocessing_report is not None:
         log.append(
@@ -70,15 +72,19 @@ def run_analysis(
             )
             continue
         log.append(f"running {step_id}")
-        item = execute_step(
-            step,
-            processed_dataset,
-            active,
-            cache=cache,
-            timeout_seconds=timeout_seconds,
-            artifacts=artifacts,
-            log=log,
-        )
+        source_problem = _source_result_problem(step, results)
+        if source_problem is not None:
+            item = fail(step, processed_dataset, *source_problem)
+        else:
+            item = execute_step(
+                step,
+                processed_dataset,
+                registry,
+                cache=cache,
+                timeout_seconds=timeout_seconds,
+                artifacts=artifacts,
+                log=log,
+            )
         results.append(item)
         warnings.extend(item.warnings)
         if isinstance(item.values, dict) and item.values.get("status") == "failed":
@@ -92,3 +98,19 @@ def run_analysis(
         warnings=warnings,
     )
     return EngineResult(response, missing, log)
+
+
+def _source_result_problem(
+    step: PlanStep, results: list[AnalysisResult]
+) -> tuple[str, str] | None:
+    source_result_id = step.arguments.get("source_result_id")
+    if source_result_id is None or not isinstance(source_result_id, str):
+        return None
+    source = next(
+        (result for result in results if result.result_id == source_result_id), None
+    )
+    if source is None:
+        return "INVALID_DATA", f"Unknown source_result_id: {source_result_id}"
+    if isinstance(source.values, dict) and source.values.get("status") == "failed":
+        return "DEPENDENCY_FAILED", f"Source result failed: {source_result_id}"
+    return None

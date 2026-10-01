@@ -68,9 +68,11 @@ def default_registry() -> ToolRegistry:
     from backend.app.tools.analysis.group_aggregate import (
         TOOL as GROUP_AGGREGATE_TOOL,
     )
+    from backend.app.tools.visualization.catalog import register_visualization
 
     registry = ToolRegistry()
     registry.register(TOOL)
     registry.register(GROUP_AGGREGATE_TOOL)
     registry.register(CATEGORICAL_ANALYSIS_TOOL)
+    register_visualization(registry)
     return registry

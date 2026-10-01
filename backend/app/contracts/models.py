@@ -82,6 +82,13 @@ class Artifact(ContractModel):
     storage_ref: NonEmptyString
 
 
+class VisualizationResult(ContractModel):
+    sample_size: int = Field(ge=0)
+    source_result_ids: list[NonEmptyString] = Field(default_factory=list)
+    artifacts: list[Artifact] = Field(min_length=1)
+    warnings: list[WarningEvent] = Field(default_factory=list)
+
+
 class Finding(ContractModel):
     claim: NonEmptyString
     result_ids: list[NonEmptyString] = Field(min_length=1)
