@@ -1,0 +1,16 @@
+id,Full Name,email,signup date,amount,country,is_active
+1,  John Smith,JOHN.SMITH@EXAMPLE.COM ,2026-01-05,"$1,200.00",USA,Yes
+2,jane doe,jane@example.com,05/01/2026,900,U.S.A.,yes
+3,JOHN SMITH,john.smith@example.com,"Jan 5, 2026",1200,United States,TRUE
+4,María  García,maria@example,2026-1-7,€750.5,Spain ,1
+5,,noname@example.com,,N/A,,0
+6,Liu Yang,liu.yang@example.com,2026/01/09,2000.00,china,No
+7,Liu Yang,liu.yang@example.com,2026-01-09,"2,000",China,no
+8,"O'Brien, Sean",sean.obrien@example.com,10-01-2026,  450 ,Ireland,FALSE
+9,anna müller,anna.mueller@example.com,2026.01.11,"1.250,00",Germany,true
+10,Anna Muller,ANNA.MUELLER@example.com,11 Jan 2026,1250,DE,Y
+11,Carlos Ruiz , carlos@example.com,2026-01-12,-30,Mexico,active
+12,Priya   Shah,priya.shah@example.com,13/01/2026,3400,India,yes
+13,13,bad-row,not a date,free,??,
+14,Tom Hardy,tom.hardy@example.com,2026-01-14,"$5,000",UK,TRUE
+15,tom hardy,tom.hardy@example.com ,2026-01-14,5000,United Kingdom,true
