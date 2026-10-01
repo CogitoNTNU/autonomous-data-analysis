@@ -35,6 +35,9 @@ uv run --project backend pre-commit install --config .config/pre-commit-config.y
 
 ## Usage
 
+See [Running the project](RUNNING.md) for setup, test, dataset, and live
+workflow instructions.
+
 Inspect the included penguins dataset:
 
 ```bash
