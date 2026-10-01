@@ -5,8 +5,9 @@ from backend.app.contracts.models import (
     Plan,
     PlanStep,
 )
+from backend.app.tools.analysis.descriptive import default_registry
+from backend.app.tools.analysis.group_aggregate import TOOL as GROUP_AGGREGATE_TOOL
 from backend.app.tools.registry import ToolRegistry
-from pydantic import BaseModel
 
 
 def make_dataset() -> DatasetReference:
@@ -32,8 +33,14 @@ def make_valid_plan() -> Plan:
                 step_id="step-1",
                 tool_name="group_aggregate",
                 arguments={
-                    "columns": ["body_mass_g"],
                     "group_by": ["species"],
+                    "aggregations": [
+                        {
+                            "column": "body_mass_g",
+                            "function": "mean",
+                            "alias": "average_body_mass",
+                        }
+                    ],
                 },
                 depends_on=[],
             )
@@ -45,23 +52,7 @@ def make_valid_plan() -> Plan:
 
 def make_registry() -> ToolRegistry:
     registry = ToolRegistry()
-
-    class GroupAggregateInput(BaseModel):
-        columns: list[str]
-        group_by: list[str]
-
-    from backend.app.tools.registry import Tool
-
-    registry.register(
-        Tool(
-            name="group_aggregate",
-            description="Aggregate numeric columns by groups.",
-            input_model=GroupAggregateInput,
-            accepted_dtypes=frozenset({"float", "integer"}),
-            run=lambda dataset, **kwargs: {},
-        )
-    )
-
+    registry.register(GROUP_AGGREGATE_TOOL)
     return registry
 
 
@@ -120,3 +111,105 @@ def test_planner_rejects_invalid_plan():
     assert response.status == "error"
     assert response.error is not None
     assert response.error.code == "INVALID_OUTPUT"
+
+
+def test_planner_accepts_chart_of_group_aggregate_output():
+    plan = make_valid_plan().model_copy(
+        update={
+            "analysis_steps": [
+                *make_valid_plan().analysis_steps,
+                PlanStep(
+                    step_id="step-2",
+                    tool_name="bar_chart",
+                    arguments={
+                        "title": "Average body mass by species",
+                        "x": "species",
+                        "y": "average_body_mass",
+                    },
+                    depends_on=["step-1"],
+                ),
+            ]
+        }
+    )
+
+    response = run_planner(
+        user_query="Calculate and chart average body mass by species.",
+        dataset=make_dataset(),
+        conversation_context=[],
+        critique=None,
+        registry=default_registry(),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "success"
+
+
+def test_planner_rejects_derived_chart_column_without_dependency():
+    plan = make_valid_plan().model_copy(
+        update={
+            "analysis_steps": [
+                *make_valid_plan().analysis_steps,
+                PlanStep(
+                    step_id="step-2",
+                    tool_name="bar_chart",
+                    arguments={
+                        "title": "Average body mass by species",
+                        "x": "species",
+                        "y": "average_body_mass",
+                    },
+                ),
+            ]
+        }
+    )
+
+    response = run_planner(
+        user_query="Calculate and chart average body mass by species.",
+        dataset=make_dataset(),
+        conversation_context=[],
+        critique=None,
+        registry=default_registry(),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert "average_body_mass" in response.error.message
+
+
+def test_planner_accepts_date_axis_with_numeric_measure():
+    dataset = DatasetReference(
+        dataset_id="sales",
+        version="v1",
+        storage_ref="data/sales.csv",
+        schema={
+            "Transaction Date": {"datatype": "date"},
+            "Total Spent": {"datatype": "float"},
+        },
+    )
+    plan = Plan(
+        plan_id="sales-over-time",
+        objective="Show spending over time.",
+        required_columns=["Transaction Date", "Total Spent"],
+        analysis_steps=[
+            PlanStep(
+                step_id="draw-line",
+                tool_name="line_chart",
+                arguments={
+                    "title": "Spending over time",
+                    "x": "Transaction Date",
+                    "y": "Total Spent",
+                },
+            )
+        ],
+    )
+
+    response = run_planner(
+        user_query="Chart spending over time.",
+        dataset=dataset,
+        conversation_context=[],
+        critique=None,
+        registry=default_registry(),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "success"

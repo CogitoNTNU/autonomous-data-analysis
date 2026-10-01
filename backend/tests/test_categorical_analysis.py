@@ -1,82 +1,88 @@
 from pathlib import Path
 
+import pytest
+
 from backend.app.agents.analysis import execute_step, run_analysis
-from backend.app.contracts.models import DatasetReference, PlanStep
-from backend.app.tools.analysis.categorical import TOOL, run
-from backend.app.tools.registry import ToolRegistry
+from backend.app.contracts.models import DatasetReference, PlanStep, PreprocessingReport
+from backend.app.tools.analysis.categorical import run
+from backend.app.tools.analysis.descriptive import default_registry
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SCHEMA = {
-    "city": {"datatype": "string"},
-    "status": {"datatype": "string"},
-    "blank": {"datatype": "string"},
+    "region": {"datatype": "string"},
+    "segment": {"datatype": "string"},
+    "revenue": {"datatype": "float"},
+    "units": {"datatype": "integer"},
 }
 
 
 def _dataset() -> DatasetReference:
     return DatasetReference(
-        dataset_id="categories",
+        dataset_id="grouped",
         version="v1",
-        storage_ref=str(FIXTURES / "categories.csv"),
+        storage_ref=str(FIXTURES / "grouped.csv"),
         schema=SCHEMA,
     )
 
 
-def _registry() -> ToolRegistry:
-    registry = ToolRegistry()
-    registry.register(TOOL)
-    return registry
+def test_categorical_analysis_counts_observed_values():
+    payload = run(_dataset(), column="region", normalize=False)
 
-
-def test_counts_each_category():
-    payload = run(_dataset(), column="city", normalize=False)
     assert payload["categories"] == [
-        {"value": "Bergen", "count": 2},
-        {"value": "Oslo", "count": 2},
+        {"value": "North", "count": 2},
+        {"value": "South", "count": 1},
     ]
-    assert payload["mode"] == ["Bergen", "Oslo"]
-    assert payload["missing_count"] == 0
+    assert payload["mode"] == ["North"]
     assert payload["omitted_categories"] == 0
+    assert payload["category_count"] == 2
+    assert payload["observed_count"] == 3
+    assert payload["missing_count"] == 1
+    assert payload["sample_size"] == 4
+    assert {warning.code for warning in payload["warnings"]} >= {
+        "HIGH_MISSING_RATE",
+        "LOW_SAMPLE_SIZE",
+    }
 
 
-def test_normalize_returns_proportions():
-    payload = run(_dataset(), column="city", normalize=True)
+def test_categorical_analysis_normalizes_by_observed_values():
+    payload = run(_dataset(), column="segment", normalize=True)
+
     assert payload["categories"] == [
-        {"value": "Bergen", "proportion": 0.5},
-        {"value": "Oslo", "proportion": 0.5},
+        {"value": "A", "proportion": pytest.approx(0.75)},
+        {"value": "B", "proportion": pytest.approx(0.25)},
     ]
+    assert payload["normalized"] is True
+    assert payload["missing_count"] == 0
 
 
-def test_unknown_column_is_rejected_before_the_file_is_read():
-    dataset = DatasetReference(
-        dataset_id="missing-file",
-        version="v1",
-        storage_ref="/tmp/categorical-analysis-missing.csv",
-        schema=SCHEMA,
-    )
+def test_categorical_analysis_rejects_unknown_column_before_execution():
     result = execute_step(
         PlanStep(
-            step_id="cats",
+            step_id="categories",
             tool_name="categorical_analysis",
             arguments={"column": "missing", "normalize": False},
         ),
-        dataset,
-        _registry(),
+        _dataset(),
+        default_registry(),
     )
+
     assert result.values["code"] == "MISSING_COLUMN"
+    assert result.values["status"] == "failed"
 
 
-def test_empty_column_is_insufficient_data():
-    payload = run(_dataset(), column="blank", normalize=False)
-    assert payload["categories"] == []
-    assert any(item.code == "INSUFFICIENT_DATA" for item in payload["warnings"])
+def test_categorical_analysis_rejects_numeric_column():
+    result = execute_step(
+        PlanStep(
+            step_id="categories",
+            tool_name="categorical_analysis",
+            arguments={"column": "units", "normalize": False},
+        ),
+        _dataset(),
+        default_registry(),
+    )
 
-
-def test_constant_column_is_flagged():
-    payload = run(_dataset(), column="status", normalize=False)
-    assert payload["n_categories"] == 1
-    assert payload["mode"] == ["ok"]
-    assert any(item.code == "CONSTANT_COLUMN" for item in payload["warnings"])
+    assert result.values["code"] == "INVALID_DATA"
+    assert "units" in result.values["error"]
 
 
 def test_high_cardinality_keeps_the_largest_groups():
@@ -88,32 +94,46 @@ def test_high_cardinality_keeps_the_largest_groups():
     )
     payload = run(dataset, column="item", normalize=False)
     shown = [row["value"] for row in payload["categories"]]
-    assert payload["n_categories"] == 11
+    assert payload["category_count"] == 11
     assert payload["omitted_categories"] == 1
     assert shown == list("abcdefghij")
     assert payload["mode"] == list("abcdefghijk")
     assert any(item.code == "HIGH_CARDINALITY" for item in payload["warnings"])
 
 
-def test_workflow_registry_includes_categorical_analysis():
-    from backend.app.agents.preprocessing import register_preprocessing_tools
-    from backend.app.tools.analysis.descriptive import default_registry
+def test_analysis_agent_uses_preprocessed_dataset_for_categorical_step():
+    preprocessing_report = PreprocessingReport(
+        changes=["Removed one incomplete row"],
+        affected_columns=["region"],
+        rows_before=5,
+        rows_after=4,
+    )
+    step = PlanStep(
+        step_id="region-distribution",
+        tool_name="categorical_analysis",
+        arguments={"column": "region", "normalize": False},
+    )
 
-    registry = register_preprocessing_tools(default_registry())
-    assert registry.get("categorical_analysis") is not None
-
-
-def test_analysis_agent_runs_categorical_analysis():
     engine = run_analysis(
         _dataset(),
-        [
-            PlanStep(
-                step_id="cats",
-                tool_name="categorical_analysis",
-                arguments={"column": "city", "normalize": False},
-            )
-        ],
+        [step],
+        preprocessing_report,
+        registry=default_registry(),
     )
-    results = engine.response.updates.analysis_results
-    assert results[0].method == "categorical_analysis"
-    assert results[0].values["categories"][0]["value"] == "Bergen"
+
+    result = engine.response.updates.analysis_results[0]
+    assert result.step_id == "region-distribution"
+    assert result.dataset_version == "v1"
+    assert result.method == "categorical_analysis"
+    assert result.sample_size == 4
+    assert result.values["categories"] == [
+        {"value": "North", "count": 2},
+        {"value": "South", "count": 1},
+    ]
+    assert result.values["mode"] == ["North"]
+    assert engine.missing_steps == []
+    assert engine.execution_log == [
+        "preprocessing 5->4",
+        "running region-distribution",
+        "ok region-distribution",
+    ]

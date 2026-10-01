@@ -5,7 +5,7 @@ from backend.app.agents.preprocessing import run_shared_preprocessing
 from backend.app.contracts.models import PlanStep
 from backend.app.storage.datasets import create_dataset_reference
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 def _rows(path: Path) -> list[dict[str, str]]:
@@ -14,8 +14,8 @@ def _rows(path: Path) -> list[dict[str, str]]:
 
 
 def test_cleaning_normalizes_text_before_removing_logical_duplicates() -> None:
-    source = DATA / "sample-dirty-data.csv"
-    expected = DATA / "sample-dirty-data-clean.csv"
+    source = FIXTURES / "sample-dirty-data.csv"
+    expected = FIXTURES / "sample-dirty-data-clean.csv"
     dataset = create_dataset_reference(source)
     steps = [
         PlanStep(
@@ -65,9 +65,7 @@ def test_cleaning_normalizes_text_before_removing_logical_duplicates() -> None:
         PlanStep(
             step_id="remove_duplicates",
             tool_name="remove_duplicates",
-            arguments={
-                "subset": ["email", "signup date", "amount", "is_active"]
-            },
+            arguments={"subset": ["email", "signup date", "amount", "is_active"]},
             depends_on=["convert_types"],
         ),
     ]

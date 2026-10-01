@@ -1,6 +1,10 @@
 """Validation for plans produced by the Planner Agent."""
 
 from backend.app.contracts.models import DatasetReference, Plan, PlanStep
+from backend.app.tools.analysis.derived import (
+    VISUALIZATION_TOOL_NAMES,
+    group_aggregate_schema,
+)
 from backend.app.tools.registry import (
     Tool,
     ToolPhase,
@@ -20,7 +24,7 @@ def validate_plan(
     _validate_unique_step_ids(plan)
     _validate_dependencies(plan)
     processed_dataset = _validate_preprocessing_steps(plan, dataset, registry)
-    _validate_steps(plan.analysis_steps, processed_dataset, registry, "analysis")
+    _validate_analysis_steps(plan, processed_dataset, registry)
 
 
 def _validate_required_columns(
@@ -56,14 +60,55 @@ def _validate_dependencies(plan: Plan) -> None:
     order_steps([*plan.preprocessing_steps, *plan.analysis_steps])
 
 
-def _validate_steps(
-    steps: list[PlanStep],
+def _validate_analysis_steps(
+    plan: Plan,
     dataset: DatasetReference,
     registry: ToolRegistry,
-    expected_phase: ToolPhase,
 ) -> None:
-    for step in steps:
-        _validate_step(step, dataset, registry, expected_phase)
+    preprocessing_ids = {step.step_id for step in plan.preprocessing_steps}
+    ordered_steps = [
+        step.model_copy(
+            update={
+                "depends_on": [
+                    dependency
+                    for dependency in step.depends_on
+                    if dependency not in preprocessing_ids
+                ]
+            }
+        )
+        for step in plan.analysis_steps
+    ]
+    by_id = {step.step_id: step for step in plan.analysis_steps}
+    output_schemas: dict[str, dict[str, object]] = {}
+    for step_id in order_steps(ordered_steps):
+        step = by_id[step_id]
+        input_dataset = _analysis_input_dataset(step, dataset, output_schemas)
+        _validate_step(step, input_dataset, registry, "analysis")
+        if step.tool_name == "group_aggregate":
+            output_schemas[step_id] = group_aggregate_schema(
+                step.arguments, input_dataset.dataset_schema
+            )
+
+
+def _analysis_input_dataset(
+    step: PlanStep,
+    dataset: DatasetReference,
+    output_schemas: dict[str, dict[str, object]],
+) -> DatasetReference:
+    if step.tool_name not in VISUALIZATION_TOOL_NAMES:
+        return dataset
+    columns = {
+        column
+        for name in ("x", "y", "group")
+        if isinstance(column := step.arguments.get(name), str)
+    }
+    if columns <= set(dataset.dataset_schema):
+        return dataset
+    for dependency in step.depends_on:
+        schema = output_schemas.get(dependency)
+        if schema is not None and columns <= set(schema):
+            return dataset.model_copy(update={"dataset_schema": schema})
+    return dataset
 
 
 def _validate_preprocessing_steps(

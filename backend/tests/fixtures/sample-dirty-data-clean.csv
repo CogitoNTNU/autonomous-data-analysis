@@ -1,0 +1,10 @@
+id,Full Name,email,signup date,amount,country,is_active
+1,John Smith,john.smith@example.com,2026-01-05,1200,United States,true
+2,Jane Doe,jane@example.com,2026-01-05,900,United States,true
+4,María García,maria@example,2026-01-07,750.5,Spain,true
+6,Liu Yang,liu.yang@example.com,2026-01-09,2000,China,false
+8,"O'Brien, Sean",sean.obrien@example.com,2026-01-10,450,Ireland,false
+9,Anna Müller,anna.mueller@example.com,2026-01-11,1250,Germany,true
+11,Carlos Ruiz,carlos@example.com,2026-01-12,-30,Mexico,true
+12,Priya Shah,priya.shah@example.com,2026-01-13,3400,India,true
+14,Tom Hardy,tom.hardy@example.com,2026-01-14,5000,United Kingdom,true

@@ -10,7 +10,7 @@ matplotlib.use("Agg")  # ingen GUI, vi skriver bare en fil
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
-from backend.app.contracts.models import Artifact
+from backend.app.contracts.models import Artifact, VisualizationResult, WarningEvent
 from backend.app.tools.visualization.inputs import ChartInput
 from backend.app.tools.visualization.load import DEFAULT_ARTIFACTS, SOURCE
 
@@ -24,12 +24,13 @@ def save_chart(
     # png-en lagres utenfor state, bare referansen sendes videre
     directory = output_dir if output_dir is not None else DEFAULT_ARTIFACTS
     artifact = _write_png(draw, spec, directory)
-    return {
-        "sample_size": sample_size,
-        "source_result_ids": _sources(spec),
-        "artifacts": [artifact.model_dump()],
-        "warnings": _warnings(sample_size),
-    }
+    result = VisualizationResult(
+        sample_size=sample_size,
+        source_result_ids=_sources(spec),
+        artifacts=[artifact],
+        warnings=_warnings(sample_size),
+    )
+    return result.model_dump()
 
 
 def _write_png(
@@ -57,9 +58,9 @@ def _sources(spec: ChartInput) -> list[str]:
     return [spec.source_result_id]
 
 
-def _warnings(sample_size: int) -> list[dict[str, str]]:
+def _warnings(sample_size: int) -> list[WarningEvent]:
     # samme tommelfingerregel som descriptive: under 30 rader er tynt
     if sample_size < 30:
         message = f"n={sample_size}"
-        return [{"code": "LOW_SAMPLE_SIZE", "message": message, "source": SOURCE}]
+        return [WarningEvent(code="LOW_SAMPLE_SIZE", message=message, source=SOURCE)]
     return []

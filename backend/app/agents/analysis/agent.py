@@ -11,25 +11,19 @@ from backend.app.contracts.models import (
     WarningEvent,
 )
 from backend.app.contracts.responses import AgentResponse
+from backend.app.tools.analysis.derived import (
+    VISUALIZATION_TOOL_NAMES,
+    group_aggregate_schema,
+)
 from backend.app.tools.registry import (
     DEFAULT_TIMEOUT_SECONDS,
     ToolRegistry,
     execute_step,
+    fail,
     order_steps,
 )
 
 SOURCE = "analysis"
-
-
-def _registry(registry: ToolRegistry | None) -> ToolRegistry:
-    if registry is not None:
-        return registry
-    from backend.app.tools.analysis.descriptive import default_registry
-    from backend.app.tools.visualization.catalog import register_visualization
-
-    active = default_registry()
-    register_visualization(active)  # diagrammene kjøres herfra, sammen med analysen
-    return active
 
 
 def run_analysis(
@@ -39,7 +33,10 @@ def run_analysis(
     registry: ToolRegistry | None = None,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> EngineResult:
-    active = _registry(registry)
+    if registry is None:
+        from backend.app.tools.analysis.descriptive import default_registry
+
+        registry = default_registry()
     log: list[str] = []
     if preprocessing_report is not None:
         log.append(
@@ -79,15 +76,23 @@ def run_analysis(
             )
             continue
         log.append(f"running {step_id}")
-        item = execute_step(
-            step,
-            processed_dataset,
-            active,
-            cache=cache,
-            timeout_seconds=timeout_seconds,
-            artifacts=artifacts,
-            log=log,
-        )
+        source_problem = _source_result_problem(step, results)
+        if source_problem is not None:
+            item = fail(step, processed_dataset, *source_problem)
+        else:
+            execution_dataset, runtime_arguments = _dependency_input(
+                step, results, processed_dataset
+            )
+            item = execute_step(
+                step,
+                execution_dataset,
+                registry,
+                cache=cache,
+                timeout_seconds=timeout_seconds,
+                artifacts=artifacts,
+                log=log,
+                runtime_arguments=runtime_arguments,
+            )
         results.append(item)
         warnings.extend(item.warnings)
         if isinstance(item.values, dict) and item.values.get("status") == "failed":
@@ -101,3 +106,61 @@ def run_analysis(
         warnings=warnings,
     )
     return EngineResult(response, missing, log)
+
+
+def _source_result_problem(
+    step: PlanStep, results: list[AnalysisResult]
+) -> tuple[str, str] | None:
+    source_result_id = step.arguments.get("source_result_id")
+    if source_result_id is None or not isinstance(source_result_id, str):
+        return None
+    source = next(
+        (
+            result
+            for result in results
+            if result.result_id == source_result_id
+            or (
+                result.step_id == source_result_id
+                and result.step_id in step.depends_on
+            )
+        ),
+        None,
+    )
+    if source is None:
+        return "INVALID_DATA", f"Unknown source_result_id: {source_result_id}"
+    if isinstance(source.values, dict) and source.values.get("status") == "failed":
+        return "DEPENDENCY_FAILED", f"Source result failed: {source_result_id}"
+    return None
+
+
+def _dependency_input(
+    step: PlanStep,
+    results: list[AnalysisResult],
+    dataset: DatasetReference,
+) -> tuple[DatasetReference, dict[str, object] | None]:
+    if step.tool_name not in VISUALIZATION_TOOL_NAMES:
+        return dataset, None
+    columns = {
+        column
+        for name in ("x", "y", "group")
+        if isinstance(column := step.arguments.get(name), str)
+    }
+    if columns <= set(dataset.dataset_schema):
+        return dataset, None
+    for dependency in step.depends_on:
+        source = next(
+            (result for result in results if result.step_id == dependency), None
+        )
+        if source is None or not isinstance(source.values, dict):
+            continue
+        rows = source.values.get("groups")
+        if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+            continue
+        schema = group_aggregate_schema(source.parameters, dataset.dataset_schema)
+        if columns <= set(schema):
+            derived_dataset = dataset.model_copy(update={"dataset_schema": schema})
+            return derived_dataset, {
+                "_source_rows": rows,
+                "source_result_id": source.result_id,
+            }
+    return dataset, None

@@ -237,6 +237,13 @@ Each preprocessing or analysis step must be a PlanStep containing:
 - arguments
 - depends_on
 
+When a visualization uses columns produced by `group_aggregate`, it must depend
+on that aggregation step. Use the aggregation aliases as the chart columns only
+when that dependency is present. Otherwise, visualization `x`, `y`, and `group`
+must be columns in the active dataset. A `bar_chart` over raw data calculates
+the mean of `y` for each `x` itself, so it can also visualize an average without
+a separate aggregation step.
+
 The objective should describe what the analysis is intended to determine,
 not the implementation details.
 
