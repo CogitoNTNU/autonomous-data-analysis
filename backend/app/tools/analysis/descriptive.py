@@ -79,6 +79,9 @@ TOOL = Tool(
 
 
 def default_registry() -> ToolRegistry:
+    from backend.app.tools.analysis.time_series import TOOL as TIME_SERIES_TOOL
+
     registry = ToolRegistry()
     registry.register(TOOL)
+    registry.register(TIME_SERIES_TOOL)
     return registry

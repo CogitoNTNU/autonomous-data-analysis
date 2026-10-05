@@ -1,0 +1,6 @@
+date,revenue
+2024-01-01,10
+not-a-date,20
+2024-01-15,not-a-number
+,40
+2024-02-01,30
