@@ -168,7 +168,7 @@ def _referenced_columns(parsed: BaseModel) -> list[str]:
         columns.add(plural_columns)
     elif plural_columns:
         columns.update(plural_columns)
-    for attribute in ("column", "subset", "group_by"):
+    for attribute in ("column", "subset", "group_by", "index", "values"):
         value = getattr(parsed, attribute, None)
         if isinstance(value, str):
             columns.add(value)
@@ -194,6 +194,9 @@ def _dtype_checked_columns(
     numeric_columns = getattr(parsed, "numeric_columns", None)
     if numeric_columns is not None:
         return sorted(numeric_columns)
+    values = getattr(parsed, "values", None)
+    if isinstance(values, str):
+        return [values]
     aggregations = getattr(parsed, "aggregations", None)
     if aggregations is None:
         return referenced_columns

@@ -65,8 +65,21 @@ def default_registry() -> ToolRegistry:
     from backend.app.tools.analysis.categorical import (
         TOOL as CATEGORICAL_ANALYSIS_TOOL,
     )
+    from backend.app.tools.analysis.compare_groups import (
+        TOOL as COMPARE_GROUPS_TOOL,
+    )
     from backend.app.tools.analysis.group_aggregate import (
         TOOL as GROUP_AGGREGATE_TOOL,
+    )
+    from backend.app.tools.analysis.pivot_table import (
+        TOOL as PIVOT_TABLE_TOOL,
+    )
+    from backend.app.tools.analysis.sort_results import (
+        TOOL as SORT_RESULTS_TOOL,
+    )
+    from backend.app.tools.analysis.top_n import TOOL as TOP_N_TOOL
+    from backend.app.tools.analysis.value_counts import (
+        TOOL as VALUE_COUNTS_TOOL,
     )
     from backend.app.tools.visualization.catalog import register_visualization
 
@@ -74,5 +87,10 @@ def default_registry() -> ToolRegistry:
     registry.register(TOOL)
     registry.register(GROUP_AGGREGATE_TOOL)
     registry.register(CATEGORICAL_ANALYSIS_TOOL)
+    registry.register(VALUE_COUNTS_TOOL)
+    registry.register(PIVOT_TABLE_TOOL)
+    registry.register(COMPARE_GROUPS_TOOL)
+    registry.register(SORT_RESULTS_TOOL)
+    registry.register(TOP_N_TOOL)
     register_visualization(registry)
     return registry
