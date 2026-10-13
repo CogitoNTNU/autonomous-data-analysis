@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from .errors import AgentError
 from .models import (
+    AnalysisExecutionReport,
     AnalysisResult,
     Artifact,
     ConversationMessage,
@@ -27,6 +28,7 @@ class AgentState(TypedDict):
     plan: Plan | None
     processed_dataset: DatasetReference | None
     preprocessing_report: PreprocessingReport | None
+    analysis_execution_report: AnalysisExecutionReport | None
     analysis_results: list[AnalysisResult]
     artifacts: list[Artifact]
     interpretation: Interpretation | None
@@ -57,6 +59,7 @@ def create_initial_state(
         plan=None,
         processed_dataset=None,
         preprocessing_report=None,
+        analysis_execution_report=None,
         analysis_results=[],
         artifacts=[],
         interpretation=None,

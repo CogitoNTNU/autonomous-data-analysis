@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 AgentName = Literal[
     "planner", "preprocessing", "analysis", "interpretation", "critic", "chat"
@@ -139,7 +139,36 @@ class PreprocessingUpdates(ContractModel):
     preprocessing_report: PreprocessingReport | None = None
 
 
+class AnalysisExecutionReport(ContractModel):
+    """Step execution outcome; complete does not imply Critic approval.
+
+    A failed report with no step outcomes represents rejection before execution.
+    """
+
+    outcome: Literal["complete", "partial", "failed"]
+    completed_step_ids: list[NonEmptyString] = Field(default_factory=list)
+    failed_step_ids: list[NonEmptyString] = Field(default_factory=list)
+    skipped_step_ids: list[NonEmptyString] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_outcome(self) -> "AnalysisExecutionReport":
+        ids = self.completed_step_ids + self.failed_step_ids + self.skipped_step_ids
+        if len(ids) != len(set(ids)):
+            raise ValueError("Step outcomes must be unique and disjoint")
+        expected = (
+            "failed"
+            if not self.completed_step_ids
+            else "partial"
+            if self.failed_step_ids or self.skipped_step_ids
+            else "complete"
+        )
+        if self.outcome != expected:
+            raise ValueError("Outcome does not match recorded steps")
+        return self
+
+
 class AnalysisUpdates(ContractModel):
+    execution_report: AnalysisExecutionReport | None = None
     analysis_results: list[AnalysisResult] = Field(default_factory=list)
     artifacts: list[Artifact] = Field(default_factory=list)
 

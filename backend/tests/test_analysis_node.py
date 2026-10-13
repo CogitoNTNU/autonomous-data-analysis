@@ -53,8 +53,11 @@ def test_analysis_node_writes_tool_results_onto_state():
 
     patch = analysis_node(state, registry=_registry(tool))
 
-    assert patch["analysis_results"][0].step_id == "s1"
-    assert patch["artifacts"] == []
+    assert patch.updates.analysis_results[0].step_id == "s1"
+    assert patch.updates.artifacts == []
+    assert patch.status == "success"
+    assert patch.updates.execution_report.outcome == "complete"
+    assert patch.updates.execution_report.completed_step_ids == ["s1"]
     assert tool.call_count == 1
 
 
@@ -64,6 +67,6 @@ def test_analysis_node_warns_when_plan_is_missing():
 
     patch = analysis_node(state)
 
-    assert "analysis_results" not in patch
-    assert patch["warnings"][0].code == "INVALID_DATA"
-    assert "plan" in patch["warnings"][0].message
+    assert patch.status == "error"
+    assert patch.error.code == "INVALID_DATA"
+    assert "plan" in patch.error.message

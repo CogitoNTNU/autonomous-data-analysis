@@ -77,7 +77,7 @@ def test_planner_preprocessing_analysis_share_workflow_contracts():
 
         state.update(updates)
         analysis_updates = analysis_node(state, registry)
-        result = analysis_updates["analysis_results"][0]
+        result = analysis_updates.updates.analysis_results[0]
         assert result.dataset_version == processed_dataset.version
         assert result.sample_size == 1
         assert result.values["columns"]["score"]["mean"] == 1.5

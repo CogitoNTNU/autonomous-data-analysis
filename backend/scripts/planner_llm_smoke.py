@@ -81,7 +81,15 @@ def main() -> int:
             pprint(state["errors"])
         return 1
     state.update(preprocessing_node(state))
-    state.update(analysis_node(state, registry))
+    analysis_response = analysis_node(state, registry)
+    state["analysis_results"] = analysis_response.updates.analysis_results
+    state["artifacts"] = analysis_response.updates.artifacts
+    state["analysis_execution_report"] = analysis_response.updates.execution_report
+    state["warnings"].extend(analysis_response.warnings)
+    if analysis_response.error is not None:
+        state["errors"].append(analysis_response.error)
+        _print_state(state)
+        return 1
     _print_state(state)
     return 0
 

@@ -38,7 +38,12 @@ def test_analysis_node_output_is_accepted_by_interpretation_node():
         ],
     )
     # Stand in for the harness's merge; nodes themselves never call each other.
-    state.update(analysis_node(state))
+    response = analysis_node(state)
+    assert response.status == "success"
+    state["analysis_results"] = response.updates.analysis_results
+    state["artifacts"] = response.updates.artifacts
+    state["analysis_execution_report"] = response.updates.execution_report
+    state["warnings"].extend(response.warnings)
     result = state["analysis_results"][0]
     model = Mock(
         return_value=Interpretation(
