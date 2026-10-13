@@ -168,7 +168,13 @@ def _referenced_columns(parsed: BaseModel) -> list[str]:
         columns.add(plural_columns)
     elif plural_columns:
         columns.update(plural_columns)
-    for attribute in ("column", "subset", "group_by"):
+    for attribute in (
+        "column",
+        "subset",
+        "group_by",
+        "target_column",
+        "feature_columns",
+        ):
         value = getattr(parsed, attribute, None)
         if isinstance(value, str):
             columns.add(value)
