@@ -10,6 +10,7 @@ dependencies = [
     "openai>=3.19.2",
     "pandas>=3.0.5",
     "pydantic>=2.10,<3",
+    "langgraph>=1.0",
 ]
 
 
