@@ -1,6 +1,6 @@
 """Run the real Planner graph without calling an LLM or reading datasets."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -41,9 +41,17 @@ def test_planner_graph_merges_model_outcome_into_state(outcome: str) -> None:
     initial_state = create_initial_state(
         "Describe age.", dataset, run_id="graph-test", max_revisions=0
     )
-    graph = build_graph(registry=default_registry(), planner_model=model)
+    with patch(
+        "backend.app.graph.builder.preprocessing_node",
+        return_value={},
+    ) as preprocessing:
+        graph = build_graph(registry=default_registry(), planner_model=model)
+        result = graph.invoke(initial_state, config={"recursion_limit": 5})
 
-    result = graph.invoke(initial_state, config={"recursion_limit": 5})
+    if outcome == "success":
+        preprocessing.assert_called_once()
+    else:
+        preprocessing.assert_not_called()
 
     model.assert_called_once()
     context = model.call_args.args[1]
@@ -83,8 +91,14 @@ def test_executor_node_accepts_state(node_name: str) -> None:
 
     result = graph.nodes[node_name].invoke(state)
 
-    assert len(result["warnings"]) == 1
-    warning = result["warnings"][0]
-    assert warning.code == "INVALID_DATA"
-    assert warning.source == node_name
+    if node_name == "analysis":
+        assert result.status == "error"
+        assert result.error is not None
+        assert result.error.code == "INVALID_DATA"
+        assert result.error.source == "analysis"
+    else:
+        assert len(result["warnings"]) == 1
+        warning = result["warnings"][0]
+        assert warning.code == "INVALID_DATA"
+        assert warning.source == "preprocessing"
     model.assert_not_called()

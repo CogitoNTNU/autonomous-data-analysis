@@ -6,6 +6,7 @@ from backend.app.agents.analysis.node import analysis_node
 from backend.app.contracts.state import AgentState
 from backend.app.agents.planner.agent import PlannerModel
 from backend.app.tools.registry import ToolRegistry
+from backend.app.graph.routes import route_after_planner
 
 
 def build_graph(registry: ToolRegistry, planner_model: PlannerModel):
@@ -34,6 +35,15 @@ def build_graph(registry: ToolRegistry, planner_model: PlannerModel):
     )
 
     builder.add_edge(START, "planner")
-    builder.add_edge("planner", END)
+
+    builder.add_conditional_edges(
+        "planner",
+        route_after_planner, 
+        {
+            "preprocessing": "preprocessing",
+            "end": END,
+        },
+    )
+    builder.add_edge("preprocessing", END)
 
     return builder.compile()
