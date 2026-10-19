@@ -12,6 +12,7 @@ import { DatasetPreviewPanel } from "@/features/dataset-preview/DatasetPreviewPa
 import { DatasetUpload } from "@/features/dataset-upload/DatasetUpload";
 import { AppSidebar } from "@/features/workspace/AppSidebar";
 import { WorkspaceHeader } from "@/features/workspace/WorkspaceHeader";
+import { useTheme } from "@/features/workspace/use-theme";
 import type { DatasetPreview } from "@/types/dataset";
 import type {
   ClarificationOption,
@@ -28,6 +29,7 @@ type PlannerPhase =
 const PLANNER_DELAY_MS = 500;
 
 export function App() {
+  const { theme, toggleTheme } = useTheme();
   const [dataset, setDataset] = useState<DatasetPreview | null>(null);
   const [question, setQuestion] = useState("");
   const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(
@@ -117,7 +119,11 @@ export function App() {
         onReplaceDataset={replaceDataset}
       />
       <main className="relative flex min-w-0 flex-1 flex-col">
-        <WorkspaceHeader datasetName={dataset?.fileName} />
+        <WorkspaceHeader
+          datasetName={dataset?.fileName}
+          onToggleTheme={toggleTheme}
+          theme={theme}
+        />
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[760px] px-5 pb-44 sm:px-6">
             {dataset ? (

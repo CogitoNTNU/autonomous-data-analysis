@@ -5,6 +5,24 @@ import { describe, expect, it } from "vitest";
 import { App } from "@/app/App";
 
 describe("App dataset preview flow", () => {
+  it("switches between light and dark mode", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Switch to dark mode" }),
+    );
+
+    expect(document.documentElement).toHaveClass("dark");
+    expect(window.localStorage.getItem("data-analysis-theme")).toBe("dark");
+
+    await user.click(
+      screen.getByRole("button", { name: "Switch to light mode" }),
+    );
+
+    expect(document.documentElement).not.toHaveClass("dark");
+  });
+
   it("shows a table preview after a valid CSV is selected", async () => {
     const user = userEvent.setup();
     render(<App />);
