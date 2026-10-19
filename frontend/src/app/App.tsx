@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 
+import { AnalysisPlanCard } from "@/features/analysis-chat/AnalysisPlanCard";
 import { AnalysisQuestionComposer } from "@/features/analysis-chat/AnalysisQuestionComposer";
 import { ClarificationPrompt } from "@/features/analysis-chat/ClarificationPrompt";
 import { QuestionSuggestions } from "@/features/analysis-chat/QuestionSuggestions";
 import { SubmittedQuestion } from "@/features/analysis-chat/SubmittedQuestion";
 import { ThinkingIndicator } from "@/features/analysis-chat/ThinkingIndicator";
 import { getPrototypeClarification } from "@/features/analysis-chat/prototype-clarification";
+import { createPrototypeAnalysisPlan } from "@/features/analysis-chat/prototype-plan";
 import { DatasetPreviewPanel } from "@/features/dataset-preview/DatasetPreviewPanel";
 import { DatasetUpload } from "@/features/dataset-upload/DatasetUpload";
 import { AppSidebar } from "@/features/workspace/AppSidebar";
@@ -20,9 +22,10 @@ type PlannerPhase =
   | "idle"
   | "thinking"
   | "clarification"
-  | "clarification_input";
+  | "clarification_input"
+  | "plan";
 
-const CLARIFICATION_DELAY_MS = 500;
+const PLANNER_DELAY_MS = 500;
 
 export function App() {
   const [dataset, setDataset] = useState<DatasetPreview | null>(null);
@@ -41,24 +44,24 @@ export function App() {
     if (
       phase !== "thinking" ||
       !dataset ||
-      !submittedQuestion ||
-      clarificationAnswer
+      !submittedQuestion
     ) {
       return;
     }
 
-    const request = getPrototypeClarification(
-      submittedQuestion,
-      dataset.columns,
-    );
-    if (!request) {
-      return;
-    }
-
     const timeout = window.setTimeout(() => {
-      setClarification(request);
-      setPhase("clarification");
-    }, CLARIFICATION_DELAY_MS);
+      const request = clarificationAnswer
+        ? null
+        : getPrototypeClarification(submittedQuestion, dataset.columns);
+
+      if (request) {
+        setClarification(request);
+        setPhase("clarification");
+        return;
+      }
+
+      setPhase("plan");
+    }, PLANNER_DELAY_MS);
 
     return () => window.clearTimeout(timeout);
   }, [clarificationAnswer, dataset, phase, submittedQuestion]);
@@ -102,6 +105,10 @@ export function App() {
     setPhase("thinking");
   }
 
+  const analysisPlan = submittedQuestion
+    ? createPrototypeAnalysisPlan(submittedQuestion)
+    : null;
+
   return (
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
       <AppSidebar
@@ -126,6 +133,9 @@ export function App() {
                       <SubmittedQuestion question={clarificationAnswer} />
                     )}
                     {phase === "thinking" && <ThinkingIndicator />}
+                    {phase === "plan" && analysisPlan && (
+                      <AnalysisPlanCard plan={analysisPlan} />
+                    )}
                     {(phase === "clarification" ||
                       phase === "clarification_input") &&
                       clarification && (

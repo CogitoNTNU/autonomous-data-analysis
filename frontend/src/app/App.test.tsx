@@ -63,6 +63,9 @@ describe("App dataset preview flow", () => {
     ).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Thinking");
     expect(screen.getByLabelText("Analysis question")).toBeDisabled();
+    expect(
+      await screen.findByRole("heading", { name: "Analysis plan" }),
+    ).toBeVisible();
   });
 
   it("asks for clarification when more than one size measure is available", async () => {
@@ -92,5 +95,8 @@ describe("App dataset preview flow", () => {
 
     expect(screen.getByText("Body mass")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Thinking");
+    expect(
+      await screen.findByRole("heading", { name: "Analysis plan" }),
+    ).toBeVisible();
   });
 });
