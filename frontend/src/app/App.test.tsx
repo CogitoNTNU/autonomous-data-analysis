@@ -61,6 +61,7 @@ describe("App dataset preview flow", () => {
     expect(
       screen.getByText("What is the average body mass by species?"),
     ).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Thinking");
     expect(screen.getByLabelText("Analysis question")).toBeDisabled();
   });
 });

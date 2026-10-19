@@ -10,9 +10,6 @@ export function SubmittedQuestion({ question }: SubmittedQuestionProps) {
           {question}
         </p>
       </div>
-      <p className="mt-3 text-right text-[9px] text-muted-foreground">
-        Question captured · planner response comes in the next step
-      </p>
     </div>
   );
 }

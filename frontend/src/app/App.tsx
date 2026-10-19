@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AnalysisQuestionComposer } from "@/features/analysis-chat/AnalysisQuestionComposer";
 import { QuestionSuggestions } from "@/features/analysis-chat/QuestionSuggestions";
 import { SubmittedQuestion } from "@/features/analysis-chat/SubmittedQuestion";
+import { ThinkingIndicator } from "@/features/analysis-chat/ThinkingIndicator";
 import { DatasetPreviewPanel } from "@/features/dataset-preview/DatasetPreviewPanel";
 import { DatasetUpload } from "@/features/dataset-upload/DatasetUpload";
 import { AppSidebar } from "@/features/workspace/AppSidebar";
@@ -15,10 +16,12 @@ export function App() {
   const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(
     null,
   );
+  const [isThinking, setIsThinking] = useState(false);
 
   function resetQuestion() {
     setQuestion("");
     setSubmittedQuestion(null);
+    setIsThinking(false);
   }
 
   function replaceDataset() {
@@ -29,6 +32,7 @@ export function App() {
   function submitQuestion(nextQuestion: string) {
     setSubmittedQuestion(nextQuestion);
     setQuestion("");
+    setIsThinking(true);
   }
 
   return (
@@ -49,7 +53,10 @@ export function App() {
                   onReplaceDataset={replaceDataset}
                 />
                 {submittedQuestion ? (
-                  <SubmittedQuestion question={submittedQuestion} />
+                  <>
+                    <SubmittedQuestion question={submittedQuestion} />
+                    {isThinking && <ThinkingIndicator />}
+                  </>
                 ) : (
                   <QuestionSuggestions
                     dataset={dataset}
@@ -68,7 +75,7 @@ export function App() {
           </div>
         </div>
         <AnalysisQuestionComposer
-          disabled={submittedQuestion !== null}
+          disabled={submittedQuestion !== null || isThinking}
           hasDataset={dataset !== null}
           onChange={setQuestion}
           onReplaceDataset={replaceDataset}
