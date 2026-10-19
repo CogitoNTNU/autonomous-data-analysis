@@ -39,4 +39,28 @@ describe("App dataset preview flow", () => {
       screen.getByRole("heading", { name: "What are you analyzing?" }),
     ).toBeVisible();
   });
+
+  it("submits a suggested analysis question after loading a dataset", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const file = new File(
+      [
+        "species,bill_length_mm,flipper_length_mm,body_mass_g\nAdelie,39.1,181,3750",
+      ],
+      "penguins.csv",
+      { type: "text/csv" },
+    );
+    await user.upload(screen.getByLabelText("Choose CSV file"), file);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "What is the average body mass by species?",
+      }),
+    );
+
+    expect(
+      screen.getByText("What is the average body mass by species?"),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Analysis question")).toBeDisabled();
+  });
 });
