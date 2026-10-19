@@ -121,6 +121,8 @@ export function App() {
       <main className="relative flex min-w-0 flex-1 flex-col">
         <WorkspaceHeader
           datasetName={dataset?.fileName}
+          hasDataset={dataset !== null}
+          onNewAnalysis={resetQuestion}
           onToggleTheme={toggleTheme}
           theme={theme}
         />

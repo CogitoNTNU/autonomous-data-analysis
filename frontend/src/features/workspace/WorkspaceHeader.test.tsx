@@ -10,6 +10,8 @@ describe("WorkspaceHeader", () => {
     const user = userEvent.setup();
     render(
       <WorkspaceHeader
+        hasDataset={false}
+        onNewAnalysis={vi.fn()}
         onToggleTheme={onToggleTheme}
         theme="light"
       />,
@@ -23,10 +25,36 @@ describe("WorkspaceHeader", () => {
   });
 
   it("offers light mode when the dark theme is active", () => {
-    render(<WorkspaceHeader onToggleTheme={vi.fn()} theme="dark" />);
+    render(
+      <WorkspaceHeader
+        hasDataset={false}
+        onNewAnalysis={vi.fn()}
+        onToggleTheme={vi.fn()}
+        theme="dark"
+      />,
+    );
 
     expect(
       screen.getByRole("button", { name: "Switch to light mode" }),
     ).toBeVisible();
+  });
+
+  it("offers a new analysis action when a dataset is loaded", async () => {
+    const onNewAnalysis = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <WorkspaceHeader
+        hasDataset
+        onNewAnalysis={onNewAnalysis}
+        onToggleTheme={vi.fn()}
+        theme="light"
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Start new analysis" }),
+    );
+
+    expect(onNewAnalysis).toHaveBeenCalledOnce();
   });
 });

@@ -1,8 +1,6 @@
 import {
   ChevronRight,
   FileSpreadsheet,
-  MessageCircle,
-  MoreHorizontal,
   Plus,
 } from "lucide-react";
 import { useState } from "react";
@@ -12,12 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { AgentMark } from "@/features/workspace/AgentMark";
 import type { DatasetPreview } from "@/types/dataset";
-
-const recentAnalyses = [
-  "Penguin body mass analysis",
-  "Sales trend by region",
-  "Customer churn drivers",
-];
 
 type AppSidebarProps = {
   dataset: DatasetPreview | null;
@@ -37,15 +29,6 @@ export function AppSidebar({
       <div className="flex h-11 items-center gap-2.5 px-2">
         <AgentMark compact />
         <span className="text-[13px] font-semibold">Data Analysis Planner</span>
-        <Button
-          aria-label="More workspace options"
-          className="ml-auto text-muted-foreground"
-          size="icon"
-          type="button"
-          variant="ghost"
-        >
-          <MoreHorizontal className="size-4" />
-        </Button>
       </div>
 
       <Button
@@ -63,21 +46,9 @@ export function AppSidebar({
         <p className="px-3 text-[10px] font-medium text-muted-foreground">
           Recent
         </p>
-        <ul className="mt-1 space-y-0.5">
-          {recentAnalyses.map((analysis, index) => (
-            <li key={analysis}>
-              <Button
-                aria-current={index === 0 ? "page" : undefined}
-                className="h-auto w-full justify-start overflow-hidden px-3 py-2.5 text-[11px] font-normal"
-                type="button"
-                variant={index === 0 ? "outline" : "ghost"}
-              >
-                <MessageCircle className="size-3.5 shrink-0" />
-                <span className="truncate">{analysis}</span>
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <p className="mt-2 px-3 text-[10px] leading-4 text-muted-foreground">
+          No saved analyses yet.
+        </p>
       </nav>
 
       {dataset && (

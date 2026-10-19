@@ -117,4 +117,35 @@ describe("App dataset preview flow", () => {
       await screen.findByRole("heading", { name: "Analysis plan" }),
     ).toBeVisible();
   });
+
+  it("starts a new question without discarding the loaded dataset", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const file = new File(["city,amount\nOslo,249\nBergen,1299"], "sales.csv", {
+      type: "text/csv",
+    });
+    await user.upload(screen.getByLabelText("Choose CSV file"), file);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Summarize the most important patterns",
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Analysis plan" }),
+    ).toBeVisible();
+
+    await user.click(
+      screen.getByRole("button", { name: "Start new analysis" }),
+    );
+
+    expect(
+      screen.getByText("What would you like to learn from this dataset?"),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Analysis question")).toBeEnabled();
+    expect(
+      screen.queryByRole("heading", { name: "Analysis plan" }),
+    ).toBeNull();
+    expect(screen.getByRole("columnheader", { name: "city" })).toBeVisible();
+  });
 });
