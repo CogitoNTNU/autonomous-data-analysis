@@ -64,4 +64,33 @@ describe("App dataset preview flow", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Thinking");
     expect(screen.getByLabelText("Analysis question")).toBeDisabled();
   });
+
+  it("asks for clarification when more than one size measure is available", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const file = new File(
+      [
+        "species,body_mass_g,flipper_length_mm\nAdelie,3750,181\nGentoo,5000,215",
+      ],
+      "penguins.csv",
+      { type: "text/csv" },
+    );
+    await user.upload(screen.getByLabelText("Choose CSV file"), file);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Which penguins are the largest?",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "What do you mean by “largest”?",
+      }),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Body mass" }));
+
+    expect(screen.getByText("Body mass")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Thinking");
+  });
 });

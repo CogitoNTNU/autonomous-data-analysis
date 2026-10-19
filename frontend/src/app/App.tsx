@@ -1,14 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AnalysisQuestionComposer } from "@/features/analysis-chat/AnalysisQuestionComposer";
+import { ClarificationPrompt } from "@/features/analysis-chat/ClarificationPrompt";
 import { QuestionSuggestions } from "@/features/analysis-chat/QuestionSuggestions";
 import { SubmittedQuestion } from "@/features/analysis-chat/SubmittedQuestion";
 import { ThinkingIndicator } from "@/features/analysis-chat/ThinkingIndicator";
+import { getPrototypeClarification } from "@/features/analysis-chat/prototype-clarification";
 import { DatasetPreviewPanel } from "@/features/dataset-preview/DatasetPreviewPanel";
 import { DatasetUpload } from "@/features/dataset-upload/DatasetUpload";
 import { AppSidebar } from "@/features/workspace/AppSidebar";
 import { WorkspaceHeader } from "@/features/workspace/WorkspaceHeader";
 import type { DatasetPreview } from "@/types/dataset";
+import type {
+  ClarificationOption,
+  ClarificationRequest,
+} from "@/types/planner";
+
+type PlannerPhase =
+  | "idle"
+  | "thinking"
+  | "clarification"
+  | "clarification_input";
+
+const CLARIFICATION_DELAY_MS = 500;
 
 export function App() {
   const [dataset, setDataset] = useState<DatasetPreview | null>(null);
@@ -16,12 +30,45 @@ export function App() {
   const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(
     null,
   );
-  const [isThinking, setIsThinking] = useState(false);
+  const [phase, setPhase] = useState<PlannerPhase>("idle");
+  const [clarification, setClarification] =
+    useState<ClarificationRequest | null>(null);
+  const [clarificationAnswer, setClarificationAnswer] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (
+      phase !== "thinking" ||
+      !dataset ||
+      !submittedQuestion ||
+      clarificationAnswer
+    ) {
+      return;
+    }
+
+    const request = getPrototypeClarification(
+      submittedQuestion,
+      dataset.columns,
+    );
+    if (!request) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setClarification(request);
+      setPhase("clarification");
+    }, CLARIFICATION_DELAY_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [clarificationAnswer, dataset, phase, submittedQuestion]);
 
   function resetQuestion() {
     setQuestion("");
     setSubmittedQuestion(null);
-    setIsThinking(false);
+    setPhase("idle");
+    setClarification(null);
+    setClarificationAnswer(null);
   }
 
   function replaceDataset() {
@@ -30,9 +77,29 @@ export function App() {
   }
 
   function submitQuestion(nextQuestion: string) {
+    if (phase === "clarification_input") {
+      setClarificationAnswer(nextQuestion);
+      setQuestion("");
+      setPhase("thinking");
+      return;
+    }
+
     setSubmittedQuestion(nextQuestion);
     setQuestion("");
-    setIsThinking(true);
+    setClarification(null);
+    setClarificationAnswer(null);
+    setPhase("thinking");
+  }
+
+  function answerClarification(option: ClarificationOption) {
+    if (option.id === "custom") {
+      setQuestion("By largest, I mean ");
+      setPhase("clarification_input");
+      return;
+    }
+
+    setClarificationAnswer(option.label);
+    setPhase("thinking");
   }
 
   return (
@@ -55,7 +122,19 @@ export function App() {
                 {submittedQuestion ? (
                   <>
                     <SubmittedQuestion question={submittedQuestion} />
-                    {isThinking && <ThinkingIndicator />}
+                    {clarificationAnswer && (
+                      <SubmittedQuestion question={clarificationAnswer} />
+                    )}
+                    {phase === "thinking" && <ThinkingIndicator />}
+                    {(phase === "clarification" ||
+                      phase === "clarification_input") &&
+                      clarification && (
+                        <ClarificationPrompt
+                          awaitingCustomAnswer={phase === "clarification_input"}
+                          clarification={clarification}
+                          onSelect={answerClarification}
+                        />
+                      )}
                   </>
                 ) : (
                   <QuestionSuggestions
@@ -75,7 +154,9 @@ export function App() {
           </div>
         </div>
         <AnalysisQuestionComposer
-          disabled={submittedQuestion !== null || isThinking}
+          disabled={
+            phase !== "idle" && phase !== "clarification_input"
+          }
           hasDataset={dataset !== null}
           onChange={setQuestion}
           onReplaceDataset={replaceDataset}
