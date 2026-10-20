@@ -5,13 +5,16 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from backend.app.contracts.errors import AgentError
 from backend.app.contracts.models import (
     AgentName,
     DatasetReference as WorkflowDatasetReference,
     PlanStep as WorkflowPlanStep,
     PreprocessingReport as WorkflowPreprocessingReport,
+    PreprocessingUpdates,
     WarningEvent,
 )
+from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import AgentState
 from backend.app.models.dataset import DatasetReference
 from backend.app.models.plan import PlanStep
@@ -93,21 +96,33 @@ def _to_workflow_report(report: PreprocessingReport) -> WorkflowPreprocessingRep
     )
 
 
-def preprocessing_node(state: AgentState) -> dict[str, object]:
+def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]:
     """Run plan.preprocessing_steps and emit state updates for Analysis."""
     plan = state["plan"]
     if plan is None:
-        warning = WarningEvent(
-            code="INVALID_DATA",
-            message="preprocessing node requires a validated plan",
-            source=PREPROCESSING_SOURCE,
+        return AgentResponse[PreprocessingUpdates](
+            statues="error",
+            updates=PreprocessingUpdates(),
+            error=AgentError(
+                code="INVALID_DATA",
+                message="preprocessing node requires a validated plan",
+                source=PREPROCESSING_SOURCE,
+                retryable=False,
+            ),
         )
-        return {"warnings": [*state["warnings"], warning]}
 
     processed_dataset, report = run_shared_preprocessing(
-        state["dataset"], plan.preprocessing_steps
+        state["dataset"], plan.preprocessing_steps,
+        plan.preprocessing_steps,
     )
-    return {
-        "processed_dataset": processed_dataset,
-        "preprocessing_report": report,
-    }
+
+    return AgentResponse[PreprocessingUpdates](
+        status="success",
+        updates=PreprocessingUpdates(
+            processed_dataset=processed_dataset,
+            preprocessing_report=report,
+        ),
+        warnings=report.warnings,
+    )
+
+    #TODO produce error handling for more cases like invalid arguments or temporary service failures.
