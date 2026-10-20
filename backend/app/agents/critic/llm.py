@@ -3,7 +3,12 @@
 import json
 import os
 
-from openai import OpenAI
+from openai import (
+    APIConnectionError,
+    APIResponseValidationError,
+    APITimeoutError,
+    OpenAI,
+)
 
 from backend.app.agents.critic.agent import CriticContext
 from backend.app.contracts.models import Critique
@@ -36,23 +41,32 @@ class CriticLLM:
             "interpretation": context.interpretation.model_dump(mode="json"),
         }
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        f"{prompt}\n\n"
-                        "Return JSON matching this schema:\n"
-                        f"{json.dumps(Critique.model_json_schema())}"
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(payload),
-                },
-            ],
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            f"{prompt}\n\n"
+                            "Return JSON matching this schema:\n"
+                            f"{json.dumps(Critique.model_json_schema())}"
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(payload),
+                    },
+                ],
+            )
+        except APITimeoutError as error:
+            raise TimeoutError("The Critic model timed out.") from error
+        except APIConnectionError as error:
+            raise ConnectionError("The Critic provider is unreachable.") from error
+        except APIResponseValidationError as error:
+            raise ValueError(
+                "The Critic provider returned an invalid response."
+            ) from error
 
         content = response.choices[0].message.content
 

@@ -42,10 +42,15 @@ def test_planner_graph_merges_model_outcome_into_state(outcome: str) -> None:
         "Describe age.", dataset, run_id="graph-test", max_revisions=0
     )
     with patch(
-        "backend.app.graph.builder.preprocessing_node",
+        "backend.app.graph.builder.preprocessing_graph_node",
         return_value={},
     ) as preprocessing:
-        graph = build_graph(registry=default_registry(), planner_model=model)
+        graph = build_graph(
+            registry=default_registry(),
+            planner_model=model,
+            interpretation_model=Mock(),
+            critic_model=Mock(),
+        )
         result = graph.invoke(initial_state, config={"recursion_limit": 5})
 
     if outcome == "success":
@@ -87,15 +92,19 @@ def test_executor_node_accepts_state(node_name: str) -> None:
     )
     state = create_initial_state("Describe age.", dataset)
     model = Mock()
-    graph = build_graph(registry=default_registry(), planner_model=model)
+    graph = build_graph(
+        registry=default_registry(),
+        planner_model=model,
+        interpretation_model=Mock(),
+        critic_model=Mock(),
+    )
 
     result = graph.nodes[node_name].invoke(state)
 
     if node_name == "analysis":
-        assert result.status == "error"
-        assert result.error is not None
-        assert result.error.code == "INVALID_DATA"
-        assert result.error.source == "analysis"
+        assert len(result["errors"]) == 1
+        assert result["errors"][0].code == "INVALID_DATA"
+        assert result["errors"][0].source == "analysis"
     else:
         assert len(result["warnings"]) == 1
         warning = result["warnings"][0]
