@@ -92,10 +92,10 @@ def test_executor_node_accepts_state(node_name: str) -> None:
     result = graph.nodes[node_name].invoke(state)
 
     if node_name == "analysis":
-        assert result.status == "error"
-        assert result.error is not None
-        assert result.error.code == "INVALID_DATA"
-        assert result.error.source == "analysis"
+        assert len(result["errors"]) == 1
+        assert result["errors"][0].code == "INVALID_DATA"
+        assert result["errors"][0].source == "analysis"
+        assert result["analysis_results"] == []
     else:
         assert len(result["warnings"]) == 1
         warning = result["warnings"][0]
