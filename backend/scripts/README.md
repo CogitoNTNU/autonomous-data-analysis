@@ -47,3 +47,38 @@ Approved cases do not need feedback. The script does not score feedback.
 Analysis results sent to the Critic include warnings. Case names, expected
 decisions, and review notes are not sent to the model. The Critic is not given
 raw data, preprocessing reports, or artifact contents.
+
+## LangGraph LLM smoke test
+
+Run from the repository root with the existing NTNU configuration:
+
+```bash
+uv run --project backend --env-file backend/.env python -m backend.scripts.graph_llm_smoke
+```
+
+`NTNU_LLM_API_KEY` is required. Optional settings are `NTNU_LLM_BASE_URL`,
+`NTNU_LLM_MODEL`, and `NTNU_LLM_TIMEOUT_SECONDS`; defaults come from
+`app/core/llm_config.py`. Omit `--env-file backend/.env` if these variables are
+already exported. The endpoint may require NTNU network/VPN access.
+
+The default run uses `tests/fixtures/clean.csv` and descriptive statistics for
+`age`. All three reasoning models are real LLM implementations. The script
+streams the compiled graph, reports completed nodes, status, revisions, review
+decisions, interpretation validity, and error codes. It succeeds only with a
+valid cited interpretation and an approved critique. HTTP requests use the
+configured timeout without SDK retries.
+
+Run the separate controlled revision scenario with:
+
+```bash
+uv run --project backend --env-file backend/.env python -m backend.scripts.graph_llm_smoke --controlled-revision
+```
+
+This scenario injects an incorrect first Interpretation claiming a mean of
+`-999999`. Planner and Critic remain real LLMs, and subsequent Interpretation
+attempts delegate to the real LLM. Success additionally requires a real Critic
+rejection and feedback reaching the next Interpretation attempt. The script
+does not force approval or revise agent prompts to obtain a passing result.
+
+Use `--dataset`, `--column`, and `--max-revisions` to change the input or budget.
+Credentials and raw provider exceptions are never printed.
