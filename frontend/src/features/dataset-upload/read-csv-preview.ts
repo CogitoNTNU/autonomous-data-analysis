@@ -2,7 +2,7 @@ import type { DatasetPreview } from "@/types/dataset";
 
 const PREVIEW_ROW_LIMIT = 4;
 
-function readFileText(file: File): Promise<string> {
+export function readCsvText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -76,7 +76,7 @@ export function parseCsvRows(csv: string): string[][] {
 }
 
 export async function readCsvPreview(file: File): Promise<DatasetPreview> {
-  const csv = (await readFileText(file)).replace(/^\uFEFF/, "");
+  const csv = (await readCsvText(file)).replace(/^\uFEFF/, "");
   const parsedRows = parseCsvRows(csv);
   const [rawColumns, ...dataRows] = parsedRows;
 

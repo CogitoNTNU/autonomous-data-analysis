@@ -2,11 +2,13 @@
 
 from pathlib import Path
 
+from backend.app.storage.datasets import HOSTED_UPLOADS
 
 BACKEND = Path(__file__).resolve().parents[3]
 ALLOWED_DATA_DIRECTORIES = (
     (BACKEND / "data").resolve(),
     (BACKEND / "tests" / "fixtures").resolve(),
+    HOSTED_UPLOADS.resolve(),
 )
 
 

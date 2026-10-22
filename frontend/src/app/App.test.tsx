@@ -3,11 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { App } from "@/app/App";
+import { prototypePlanner } from "@/features/analysis-chat/prototype-planner";
 
 describe("App dataset preview flow", () => {
   it("switches between light and dark mode", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<App planner={prototypePlanner} />);
 
     await user.click(
       screen.getByRole("button", { name: "Switch to dark mode" }),
@@ -25,7 +26,7 @@ describe("App dataset preview flow", () => {
 
   it("shows a table preview after a valid CSV is selected", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<App planner={prototypePlanner} />);
 
     const file = new File(
       ["species,island,body_mass_g\nAdelie,Torgersen,3750\nGentoo,Biscoe,5000"],
@@ -43,7 +44,7 @@ describe("App dataset preview flow", () => {
 
   it("returns to the upload screen when the dataset is replaced", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<App planner={prototypePlanner} />);
 
     const file = new File(["name,value\nAda,1"], "sample.csv", {
       type: "text/csv",
@@ -60,7 +61,7 @@ describe("App dataset preview flow", () => {
 
   it("submits a suggested analysis question after loading a dataset", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<App planner={prototypePlanner} />);
 
     const file = new File(
       [
@@ -81,14 +82,19 @@ describe("App dataset preview flow", () => {
     ).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Thinking");
     expect(screen.getByLabelText("Analysis question")).toBeDisabled();
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Prepared an analysis plan, 3 steps",
+      }),
+    );
     expect(
-      await screen.findByRole("heading", { name: "Analysis plan" }),
+      screen.getByRole("heading", { name: "Analysis plan" }),
     ).toBeVisible();
   });
 
   it("asks for clarification when more than one size measure is available", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<App planner={prototypePlanner} />);
 
     const file = new File(
       [
@@ -114,13 +120,15 @@ describe("App dataset preview flow", () => {
     expect(screen.getByText("Body mass")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Thinking");
     expect(
-      await screen.findByRole("heading", { name: "Analysis plan" }),
+      await screen.findByRole("button", {
+        name: "Prepared an analysis plan, 3 steps",
+      }),
     ).toBeVisible();
   });
 
   it("starts a new question without discarding the loaded dataset", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<App planner={prototypePlanner} />);
 
     const file = new File(["city,amount\nOslo,249\nBergen,1299"], "sales.csv", {
       type: "text/csv",
@@ -132,7 +140,9 @@ describe("App dataset preview flow", () => {
       }),
     );
     expect(
-      await screen.findByRole("heading", { name: "Analysis plan" }),
+      await screen.findByRole("button", {
+        name: "Prepared an analysis plan, 3 steps",
+      }),
     ).toBeVisible();
 
     await user.click(
@@ -144,8 +154,54 @@ describe("App dataset preview flow", () => {
     ).toBeVisible();
     expect(screen.getByLabelText("Analysis question")).toBeEnabled();
     expect(
-      screen.queryByRole("heading", { name: "Analysis plan" }),
+      screen.queryByRole("button", {
+        name: "Prepared an analysis plan, 3 steps",
+      }),
     ).toBeNull();
     expect(screen.getByRole("columnheader", { name: "city" })).toBeVisible();
+  });
+
+  it("runs preprocessing after the plan is reviewed", async () => {
+    const user = userEvent.setup();
+    render(<App planner={prototypePlanner} />);
+
+    const file = new File(["city,amount\nOslo,249\nBergen,1299"], "sales.csv", {
+      type: "text/csv",
+    });
+    await user.upload(screen.getByLabelText("Choose CSV file"), file);
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Summarize the most important patterns",
+      }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Prepared an analysis plan, 3 steps" }),
+    ).toBeVisible();
+    expect(screen.queryByText(/The uploaded CSV is the dataset/)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Prepared an answer" }),
+    ).toBeVisible();
+    expect(screen.getByText("Preprocessing finished, 2 rows to 2")).toBeVisible();
+    expect(screen.getByText("Analysis finished, 1 result")).toBeVisible();
+    expect(screen.getByText("Interpretation finished")).toBeVisible();
+    expect(screen.getByText("Critic approved")).toBeVisible();
+    expect(
+      screen.queryByText(
+        "prepare (select_columns): Kept the columns used by the question.",
+      ),
+    ).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", { name: "Preprocessing finished, 2 rows to 2" }),
+    );
+    expect(
+      screen.getByText(
+        "prepare (select_columns): Kept the columns used by the question.",
+      ),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Prepared an answer" }));
+    expect(screen.getByText("The prepared columns can be compared.")).toBeVisible();
   });
 });

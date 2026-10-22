@@ -17,7 +17,7 @@ import {
 } from "@/features/dataset-upload/validate-dataset-file";
 
 type DatasetUploadProps = {
-  onDatasetReady?: (dataset: DatasetPreview) => void;
+  onDatasetReady?: (dataset: DatasetPreview, file: File) => void;
 };
 
 export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
@@ -42,7 +42,7 @@ export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
     try {
       const dataset = await readCsvPreview(file);
       setSelectedFile(file);
-      onDatasetReady?.(dataset);
+      onDatasetReady?.(dataset, file);
     } catch (reason: unknown) {
       setSelectedFile(null);
       setError(
@@ -172,7 +172,7 @@ export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
       )}
 
       <p className="mt-4 text-center text-[10px] text-muted-foreground">
-        The preview is read locally. Backend ingestion will be connected later.
+        The preview stays in the browser. A copy is sent to the planner.
       </p>
     </section>
   );

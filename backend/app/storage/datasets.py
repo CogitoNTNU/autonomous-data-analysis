@@ -8,9 +8,11 @@ from backend.app.contracts.models import DatasetReference
 
 
 BACKEND = Path(__file__).resolve().parents[2]
+HOSTED_UPLOADS = Path("/tmp/ada-uploads")
 ALLOWED = (
     (BACKEND / "data").resolve(),
     (BACKEND / "tests" / "fixtures").resolve(),
+    HOSTED_UPLOADS.resolve(),
 )
 
 

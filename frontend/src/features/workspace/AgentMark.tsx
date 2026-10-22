@@ -3,9 +3,14 @@ import { cn } from "@/lib/utils";
 type AgentMarkProps = {
   compact?: boolean;
   className?: string;
+  initials?: string;
 };
 
-export function AgentMark({ compact = false, className }: AgentMarkProps) {
+export function AgentMark({
+  compact = false,
+  className,
+  initials = "DA",
+}: AgentMarkProps) {
   return (
     <div
       aria-hidden="true"
@@ -15,7 +20,7 @@ export function AgentMark({ compact = false, className }: AgentMarkProps) {
         className,
       )}
     >
-      DA
+      {initials}
     </div>
   );
 }

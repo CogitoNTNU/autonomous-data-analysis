@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { AgentMark } from "@/features/workspace/AgentMark";
+import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
+import { agents } from "@/features/analysis-chat/agents";
 import type {
   ClarificationOption,
   ClarificationRequest,
@@ -17,12 +18,8 @@ export function ClarificationPrompt({
   onSelect,
 }: ClarificationPromptProps) {
   return (
-    <section
-      aria-labelledby="clarification-question"
-      className="mt-9 flex gap-4"
-    >
-      <AgentMark />
-      <div className="min-w-0 flex-1">
+    <section aria-labelledby="clarification-question">
+      <AgentTurn agent={agents.planner}>
         <h2 className="text-[13px] font-medium" id="clarification-question">
           {clarification.question}
         </h2>
@@ -48,7 +45,7 @@ export function ClarificationPrompt({
             ))}
           </div>
         )}
-      </div>
+      </AgentTurn>
     </section>
   );
 }

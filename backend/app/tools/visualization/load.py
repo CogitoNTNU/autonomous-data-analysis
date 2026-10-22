@@ -5,10 +5,15 @@ from pathlib import Path
 import pandas as pd
 
 from backend.app.contracts.models import DatasetReference
+from backend.app.storage.datasets import HOSTED_UPLOADS
 
 BACKEND = Path(__file__).resolve().parents[3]
 # samme mapper som descriptive får lese fra
-ALLOWED = ((BACKEND / "data").resolve(), (BACKEND / "tests" / "fixtures").resolve())
+ALLOWED = (
+    (BACKEND / "data").resolve(),
+    (BACKEND / "tests" / "fixtures").resolve(),
+    HOSTED_UPLOADS.resolve(),
+)
 DEFAULT_ARTIFACTS = BACKEND / "data" / "artifacts"
 SOURCE = "visualization"
 

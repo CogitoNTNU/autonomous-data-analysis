@@ -22,10 +22,77 @@ export type PlanStep = {
   description: string;
 };
 
+export type StoredPlanStep = {
+  step_id: string;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  depends_on: string[];
+};
+
+export type StoredPlan = {
+  plan_id: string;
+  objective: string;
+  required_columns: string[];
+  preprocessing_steps: StoredPlanStep[];
+  analysis_steps: StoredPlanStep[];
+  expected_outputs: string[];
+  assumptions: string[];
+};
+
 export type AnalysisPlan = {
   id: string;
   objective: string;
   steps: PlanStep[];
   assumptions: string[];
   status: "draft";
+  source: StoredPlan;
+};
+
+export type PreprocessingReport = {
+  changes: string[];
+  affectedColumns: string[];
+  rowsBefore: number;
+  rowsAfter: number;
+  warnings: string[];
+};
+
+export type AnalysisStepView = {
+  id: string;
+  method: string;
+  sampleSize: number;
+  detail: string;
+  warnings: string[];
+};
+
+export type AnalysisFigure = {
+  id: string;
+  image: string;
+};
+
+export type AnalysisReport = {
+  steps: AnalysisStepView[];
+  figures: AnalysisFigure[];
+  warnings: string[];
+  results: Record<string, unknown>[];
+  artifacts: { artifact_id: string; type: string }[];
+};
+
+export type InterpretationView = {
+  summary: string;
+  findings: string[];
+  limitations: string[];
+  unanswered: string[];
+  source: Record<string, unknown>;
+};
+
+export type CritiqueView = {
+  decision: "approved" | "revise" | "cannot_complete";
+  issues: string[];
+  requiredChanges: string[];
+  source: Record<string, unknown>;
+};
+
+export type ChatAnswer = {
+  text: string;
+  followUps: string[];
 };

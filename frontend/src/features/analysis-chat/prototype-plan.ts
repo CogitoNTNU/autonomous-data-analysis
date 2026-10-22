@@ -5,6 +5,22 @@ export function createPrototypeAnalysisPlan(objective: string): AnalysisPlan {
     id: "prototype-plan",
     objective,
     status: "draft",
+    source: {
+      plan_id: "prototype-plan",
+      objective,
+      required_columns: [],
+      preprocessing_steps: [
+        {
+          step_id: "prepare",
+          tool_name: "select_columns",
+          arguments: { columns: ["species"] },
+          depends_on: [],
+        },
+      ],
+      analysis_steps: [],
+      expected_outputs: [],
+      assumptions: ["The uploaded CSV is the dataset to use for this analysis."],
+    },
     steps: [
       {
         id: "inspect",

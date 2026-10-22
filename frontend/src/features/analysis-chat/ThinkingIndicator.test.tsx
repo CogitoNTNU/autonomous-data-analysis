@@ -8,6 +8,7 @@ describe("ThinkingIndicator", () => {
     render(<ThinkingIndicator />);
 
     const status = screen.getByRole("status");
+    expect(screen.getByText("Planner")).toBeVisible();
     expect(status).toHaveTextContent("Thinking");
     expect(status).toHaveTextContent("Reviewing the dataset structure");
     expect(status).toHaveTextContent(

@@ -1,14 +1,14 @@
 """Write one PNG and the artifact reference the analysis agent stores."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
-import matplotlib
-
-matplotlib.use("Agg")  # ingen GUI, vi skriver bare en fil
-from matplotlib import pyplot as plt
-from matplotlib.axes import Axes
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
 
 from backend.app.contracts.models import Artifact, VisualizationResult, WarningEvent
 from backend.app.tools.visualization.inputs import ChartInput
@@ -39,6 +39,7 @@ def _write_png(
     directory.mkdir(parents=True, exist_ok=True)
     artifact_id = str(uuid4())
     path = directory / f"{artifact_id}.png"
+    plt = _pyplot()
     figure, axes = plt.subplots()
     try:
         draw(axes)
@@ -50,6 +51,15 @@ def _write_png(
     finally:
         plt.close(figure)
     return Artifact(artifact_id=artifact_id, type="figure", storage_ref=str(path))
+
+
+def _pyplot():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib import pyplot as plt
+
+    return plt
 
 
 def _sources(spec: ChartInput) -> list[str]:

@@ -1,187 +1,140 @@
-import { useEffect, useState } from "react";
-
-import { AnalysisPlanCard } from "@/features/analysis-chat/AnalysisPlanCard";
+import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
+import { agents } from "@/features/analysis-chat/agents";
 import { AnalysisQuestionComposer } from "@/features/analysis-chat/AnalysisQuestionComposer";
 import { ClarificationPrompt } from "@/features/analysis-chat/ClarificationPrompt";
 import { QuestionSuggestions } from "@/features/analysis-chat/QuestionSuggestions";
+import { WorkflowTurns } from "@/features/analysis-chat/WorkflowTurns";
 import { SubmittedQuestion } from "@/features/analysis-chat/SubmittedQuestion";
 import { ThinkingIndicator } from "@/features/analysis-chat/ThinkingIndicator";
-import { getPrototypeClarification } from "@/features/analysis-chat/prototype-clarification";
-import { createPrototypeAnalysisPlan } from "@/features/analysis-chat/prototype-plan";
+import { usePlannerSession } from "@/features/analysis-chat/usePlannerSession";
+import type { PlannerClient } from "@/api/planner";
 import { DatasetPreviewPanel } from "@/features/dataset-preview/DatasetPreviewPanel";
 import { DatasetUpload } from "@/features/dataset-upload/DatasetUpload";
 import { AppSidebar } from "@/features/workspace/AppSidebar";
 import { WorkspaceHeader } from "@/features/workspace/WorkspaceHeader";
 import { useTheme } from "@/features/workspace/use-theme";
-import type { DatasetPreview } from "@/types/dataset";
-import type {
-  ClarificationOption,
-  ClarificationRequest,
-} from "@/types/planner";
 
-type PlannerPhase =
-  | "idle"
-  | "thinking"
-  | "clarification"
-  | "clarification_input"
-  | "plan";
+type AppProps = {
+  planner?: PlannerClient;
+};
 
-const PLANNER_DELAY_MS = 500;
-
-export function App() {
+export function App({ planner }: AppProps) {
   const { theme, toggleTheme } = useTheme();
-  const [dataset, setDataset] = useState<DatasetPreview | null>(null);
-  const [question, setQuestion] = useState("");
-  const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(
-    null,
-  );
-  const [phase, setPhase] = useState<PlannerPhase>("idle");
-  const [clarification, setClarification] =
-    useState<ClarificationRequest | null>(null);
-  const [clarificationAnswer, setClarificationAnswer] = useState<string | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (
-      phase !== "thinking" ||
-      !dataset ||
-      !submittedQuestion
-    ) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      const request = clarificationAnswer
-        ? null
-        : getPrototypeClarification(submittedQuestion, dataset.columns);
-
-      if (request) {
-        setClarification(request);
-        setPhase("clarification");
-        return;
-      }
-
-      setPhase("plan");
-    }, PLANNER_DELAY_MS);
-
-    return () => window.clearTimeout(timeout);
-  }, [clarificationAnswer, dataset, phase, submittedQuestion]);
-
-  function resetQuestion() {
-    setQuestion("");
-    setSubmittedQuestion(null);
-    setPhase("idle");
-    setClarification(null);
-    setClarificationAnswer(null);
-  }
-
-  function replaceDataset() {
-    setDataset(null);
-    resetQuestion();
-  }
-
-  function submitQuestion(nextQuestion: string) {
-    if (phase === "clarification_input") {
-      setClarificationAnswer(nextQuestion);
-      setQuestion("");
-      setPhase("thinking");
-      return;
-    }
-
-    setSubmittedQuestion(nextQuestion);
-    setQuestion("");
-    setClarification(null);
-    setClarificationAnswer(null);
-    setPhase("thinking");
-  }
-
-  function answerClarification(option: ClarificationOption) {
-    if (option.id === "custom") {
-      setQuestion("By largest, I mean ");
-      setPhase("clarification_input");
-      return;
-    }
-
-    setClarificationAnswer(option.label);
-    setPhase("thinking");
-  }
-
-  const analysisPlan = submittedQuestion
-    ? createPrototypeAnalysisPlan(submittedQuestion)
-    : null;
+  const session = usePlannerSession(planner);
+  const waiting =
+    session.phase === "thinking" ||
+    session.phase === "plan" ||
+    session.phase === "preprocessing" ||
+    session.phase === "analysis" ||
+    session.phase === "interpretation" ||
+    session.phase === "critic" ||
+    session.phase === "chat" ||
+    session.phase === "complete" ||
+    session.phase === "clarification";
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
       <AppSidebar
-        dataset={dataset}
-        onNewAnalysis={resetQuestion}
-        onReplaceDataset={replaceDataset}
+        dataset={session.dataset}
+        onNewAnalysis={session.resetQuestion}
+        onReplaceDataset={session.replaceDataset}
       />
       <main className="relative flex min-w-0 flex-1 flex-col">
         <WorkspaceHeader
-          datasetName={dataset?.fileName}
-          hasDataset={dataset !== null}
-          onNewAnalysis={resetQuestion}
+          datasetName={session.dataset?.fileName}
+          hasDataset={session.dataset !== null}
+          onNewAnalysis={session.resetQuestion}
           onToggleTheme={toggleTheme}
           theme={theme}
         />
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[760px] px-5 pb-44 sm:px-6">
-            {dataset ? (
+            {session.dataset ? (
+              <DatasetConversation dataset={session.dataset} session={session} />
+            ) : (
               <>
-                <DatasetPreviewPanel
-                  dataset={dataset}
-                  onReplaceDataset={replaceDataset}
+                <DatasetUpload
+                  onDatasetReady={(preview, file) => {
+                    void session.acceptDataset(preview, file);
+                  }}
                 />
-                {submittedQuestion ? (
-                  <>
-                    <SubmittedQuestion question={submittedQuestion} />
-                    {clarificationAnswer && (
-                      <SubmittedQuestion question={clarificationAnswer} />
-                    )}
-                    {phase === "thinking" && <ThinkingIndicator />}
-                    {phase === "plan" && analysisPlan && (
-                      <AnalysisPlanCard plan={analysisPlan} />
-                    )}
-                    {(phase === "clarification" ||
-                      phase === "clarification_input") &&
-                      clarification && (
-                        <ClarificationPrompt
-                          awaitingCustomAnswer={phase === "clarification_input"}
-                          clarification={clarification}
-                          onSelect={answerClarification}
-                        />
-                      )}
-                  </>
-                ) : (
-                  <QuestionSuggestions
-                    dataset={dataset}
-                    onSelect={submitQuestion}
-                  />
+                {session.error && (
+                  <PlannerError agent={agents.planner} message={session.error} />
                 )}
               </>
-            ) : (
-              <DatasetUpload
-                onDatasetReady={(nextDataset) => {
-                  setDataset(nextDataset);
-                  resetQuestion();
-                }}
-              />
             )}
           </div>
         </div>
         <AnalysisQuestionComposer
-          disabled={
-            phase !== "idle" && phase !== "clarification_input"
-          }
-          hasDataset={dataset !== null}
-          onChange={setQuestion}
-          onReplaceDataset={replaceDataset}
-          onSubmit={submitQuestion}
-          question={question}
+          disabled={waiting || session.dataset === null}
+          finished={session.phase === "complete"}
+          hasDataset={session.dataset !== null}
+          onChange={session.setQuestion}
+          onReplaceDataset={session.replaceDataset}
+          onSubmit={session.submitQuestion}
+          question={session.question}
         />
       </main>
     </div>
+  );
+}
+
+function DatasetConversation({
+  dataset,
+  session,
+}: {
+  dataset: NonNullable<ReturnType<typeof usePlannerSession>["dataset"]>;
+  session: ReturnType<typeof usePlannerSession>;
+}) {
+  return (
+    <>
+      <DatasetPreviewPanel
+        dataset={dataset}
+        onReplaceDataset={session.replaceDataset}
+      />
+      {session.submittedQuestion ? (
+        <>
+          <SubmittedQuestion question={session.submittedQuestion} />
+          {session.clarificationAnswer && (
+            <SubmittedQuestion question={session.clarificationAnswer} />
+          )}
+          {session.phase === "thinking" && <ThinkingIndicator />}
+          {session.plan && <WorkflowTurns session={session} />}
+          {(session.phase === "clarification" ||
+            session.phase === "clarification_input") &&
+            session.clarification && (
+              <ClarificationPrompt
+                awaitingCustomAnswer={session.phase === "clarification_input"}
+                clarification={session.clarification}
+                onSelect={session.answerClarification}
+              />
+            )}
+          {session.phase === "error" && session.error && !session.plan && (
+            <PlannerError agent={agents.planner} message={session.error} />
+          )}
+        </>
+      ) : (
+        <QuestionSuggestions
+          dataset={dataset}
+          onSelect={session.submitQuestion}
+        />
+      )}
+    </>
+  );
+}
+
+function PlannerError({
+  agent,
+  message,
+}: {
+  agent: (typeof agents)[keyof typeof agents];
+  message: string;
+}) {
+  return (
+    <AgentTurn agent={agent}>
+      <p className="text-xs text-destructive" role="alert">
+        {message}
+      </p>
+    </AgentTurn>
   );
 }

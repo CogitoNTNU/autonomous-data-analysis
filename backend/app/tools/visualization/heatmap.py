@@ -1,9 +1,14 @@
 """Heatmap of how many rows fall in each pair of x and y."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
-from matplotlib.axes import Axes
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
 
 from backend.app.contracts.models import DatasetReference
 from backend.app.tools.registry import Tool

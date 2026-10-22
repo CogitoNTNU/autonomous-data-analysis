@@ -262,6 +262,9 @@ storybook-static/
 !.env.example
 !.env.template
 
+# Vercel local project link. Secrets stay in the Vercel project.
+.vercel/
+
 # Local backend datasets
 /backend/data/
 
@@ -279,3 +282,4 @@ backend/data/artifacts/*.png
 ._*
 Thumbs.db
 Desktop.ini
+.vercel
