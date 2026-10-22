@@ -1,4 +1,4 @@
-"""Test preprocessing routing without executing tools or reading datasets."""
+"""Test workflow routing without executing tools or reading datasets."""
 
 from copy import deepcopy
 
@@ -6,12 +6,14 @@ import pytest
 
 from backend.app.contracts.errors import AgentError
 from backend.app.contracts.models import (
+    AnalysisExecutionReport,
+    AnalysisResult,
     DatasetReference,
     Plan,
     PreprocessingReport,
 )
 from backend.app.contracts.state import AgentState, create_initial_state
-from backend.app.graph.routes import route_after_preprocessing
+from backend.app.graph.routes import route_after_analysis, route_after_preprocessing
 
 
 @pytest.fixture
@@ -78,3 +80,76 @@ def test_route_after_preprocessing_accepts_empty_dataset(ready_state):
 
     # Sample-size suitability belongs to Analysis, not this router.
     assert route_after_preprocessing(ready_state) == "analysis"
+
+
+@pytest.fixture
+def analyzed_state(ready_state) -> AgentState:
+    ready_state["analysis_execution_report"] = AnalysisExecutionReport(
+        outcome="complete", completed_step_ids=["describe-age"],
+    )
+    ready_state["analysis_results"] = [
+        AnalysisResult(
+            result_id="result-1",
+            step_id="describe-age",
+            dataset_version="v1",
+            method="descriptive_statistics",
+            values={"mean": 20.0},
+            sample_size=3,
+        )
+    ]
+    return ready_state
+
+
+def test_route_after_analysis_selects_interpretation(analyzed_state):
+    original = deepcopy(analyzed_state)
+
+    assert route_after_analysis(analyzed_state) == "interpretation"
+    assert analyzed_state == original
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    ["plan", "processed_dataset", "analysis_execution_report"],
+)
+def test_route_after_analysis_stops_on_missing_input(analyzed_state, missing_field):
+    analyzed_state[missing_field] = None
+
+    assert route_after_analysis(analyzed_state) == "end"
+
+
+@pytest.mark.parametrize("outcome", ["partial", "failed"])
+def test_route_after_analysis_stops_on_incomplete_execution(analyzed_state, outcome):
+    analyzed_state["analysis_execution_report"] = AnalysisExecutionReport(
+        outcome=outcome,
+        completed_step_ids=["describe-age"] if outcome == "partial" else [],
+        failed_step_ids=["other-step"],
+    )
+
+    # Results alone must not bypass the execution-report policy.
+    assert analyzed_state["analysis_results"]
+    assert route_after_analysis(analyzed_state) == "end"
+
+
+def test_route_after_analysis_stops_without_results(analyzed_state):
+    analyzed_state["analysis_results"] = []
+
+    assert route_after_analysis(analyzed_state) == "end"
+
+
+def test_route_after_analysis_stops_for_clarification(analyzed_state):
+    analyzed_state["clarification_question"] = "Which age group?"
+
+    assert route_after_analysis(analyzed_state) == "end"
+
+
+def test_route_after_analysis_stops_on_error(analyzed_state):
+    analyzed_state["errors"] = [
+        AgentError(
+            code="TOOL_FAILURE",
+            message="Analysis failed.",
+            source="analysis",
+            retryable=False,
+        )
+    ]
+
+    assert route_after_analysis(analyzed_state) == "end"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from typing import Literal
 
 from backend.app.contracts.errors import AgentError
 from backend.app.contracts.models import (
@@ -101,7 +102,7 @@ def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]
     plan = state["plan"]
     if plan is None:
         return AgentResponse[PreprocessingUpdates](
-            statues="error",
+            status="error",
             updates=PreprocessingUpdates(),
             error=AgentError(
                 code="INVALID_DATA",
@@ -111,10 +112,22 @@ def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]
             ),
         )
 
-    processed_dataset, report = run_shared_preprocessing(
-        state["dataset"], plan.preprocessing_steps,
-        plan.preprocessing_steps,
-    )
+    try:
+        processed_dataset, report = run_shared_preprocessing(
+            state["dataset"], plan.preprocessing_steps,
+        )
+    except FileNotFoundError:
+        return _preprocessing_error(
+            "INVALID_DATA", "The registered dataset is unavailable."
+        )
+    except PermissionError:
+        return _preprocessing_error(
+            "TOOL_FAILURE", "Preprocessing could not access the dataset storage."
+        )
+    except ValueError:
+        return _preprocessing_error(
+            "INVALID_DATA", "The dataset or preprocessing request is invalid."
+        )
 
     return AgentResponse[PreprocessingUpdates](
         status="success",
@@ -125,4 +138,18 @@ def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]
         warnings=report.warnings,
     )
 
-    #TODO produce error handling for more cases like invalid arguments or temporary service failures.
+
+def _preprocessing_error(
+    code: Literal["INVALID_DATA", "TOOL_FAILURE"],
+    message: str,
+) -> AgentResponse[PreprocessingUpdates]:
+    return AgentResponse[PreprocessingUpdates](
+        status="error",
+        updates=PreprocessingUpdates(),
+        error=AgentError(
+            code=code,
+            message=message,
+            source=PREPROCESSING_SOURCE,
+            retryable=False,
+        ),
+    )
