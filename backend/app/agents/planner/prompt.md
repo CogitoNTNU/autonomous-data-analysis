@@ -43,7 +43,9 @@ There are two different kinds of tools relevant to planning.
 
 Dataset inspection tools may be called directly during planning. Use them
 when additional information about the dataset is needed to create a reliable
-plan.
+plan. Their names are exactly `inspect_schema`, `get_metadata`, `preview_data`,
+and `column_profile`. Call those names. `tool_column_profile` is not a tool.
+Do not put inspection tools in preprocessing_steps or analysis_steps.
 
 Preprocessing and analysis tools must not be executed by the Planner.
 They may only be selected as steps in the generated plan.

@@ -12,10 +12,12 @@ from backend.app.contracts.models import (
     ConversationMessage,
     Critique,
     DatasetReference,
+    Plan,
     PlannerUpdates,
+    PlanStep,
 )
 from backend.app.contracts.responses import AgentResponse
-from backend.app.tools.registry import ToolRegistry
+from backend.app.tools.registry import ToolRegistry, canonical_tool_name
 
 SOURCE = "planner"
 PROMPT_PATH = Path(__file__).with_name("prompt.md")
@@ -69,6 +71,7 @@ def run_planner(
     plan = output.plan
     if plan is None:
         return _invalid_output("Planner returned neither plan nor clarification")
+    plan = _with_registered_tool_names(plan, registry)
 
     try:
         validate_plan(plan, dataset, registry)
@@ -79,6 +82,24 @@ def run_planner(
         status="success",
         updates=PlannerUpdates(plan=plan),
     )
+
+
+def _with_registered_tool_names(plan: Plan, registry: ToolRegistry) -> Plan:
+    return plan.model_copy(
+        update={
+            "preprocessing_steps": [
+                _named(step, registry) for step in plan.preprocessing_steps
+            ],
+            "analysis_steps": [_named(step, registry) for step in plan.analysis_steps],
+        }
+    )
+
+
+def _named(step: PlanStep, registry: ToolRegistry) -> PlanStep:
+    name = canonical_tool_name(registry, step.tool_name)
+    if name == step.tool_name:
+        return step
+    return step.model_copy(update={"tool_name": name})
 
 
 def _invalid_output(message: str) -> AgentResponse[PlannerUpdates]:

@@ -71,6 +71,23 @@ class ToolRegistry:
         ]
 
 
+def registered_tool(registry: ToolRegistry, name: str) -> Tool | None:
+    """Return a tool, accepting the tool_ prefix some models add to the name."""
+    tool = registry.get(name)
+    if tool is not None:
+        return tool
+    if name.startswith("tool_"):
+        return registry.get(name.removeprefix("tool_"))
+    return None
+
+
+def canonical_tool_name(registry: ToolRegistry, name: str) -> str:
+    tool = registered_tool(registry, name)
+    if tool is None:
+        return name
+    return tool.name
+
+
 def execute_step(
     step: PlanStep,
     dataset: DatasetReference,
@@ -82,7 +99,7 @@ def execute_step(
     log: list[str] | None = None,
     runtime_arguments: dict[str, Any] | None = None,
 ) -> AnalysisResult:
-    tool = registry.get(step.tool_name)
+    tool = registered_tool(registry, step.tool_name)
     if tool is None:
         return fail(step, dataset, "TOOL_FAILURE", f"Unknown tool: {step.tool_name}")
     if tool.phase != "analysis":

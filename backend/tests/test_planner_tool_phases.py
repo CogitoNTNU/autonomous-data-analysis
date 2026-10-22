@@ -5,7 +5,8 @@ from backend.app.agents.planner.schema import PlannerOutput
 from backend.app.agents.preprocessing import register_preprocessing_tools
 from backend.app.contracts.models import DatasetReference, Plan, PlanStep
 from backend.app.tools.analysis.descriptive import default_registry
-from backend.app.tools.registry import execute_step
+from backend.app.tools.dataset.inspection import inspection_registry
+from backend.app.tools.registry import execute_step, registered_tool
 
 
 @pytest.mark.parametrize(
@@ -129,3 +130,47 @@ def test_planner_validates_steps_against_evolved_preprocessing_schema() -> None:
 
     assert response.status == "success"
     assert response.updates.plan == plan
+
+
+def test_tool_prefix_resolves_to_column_profile() -> None:
+    tool = registered_tool(inspection_registry(), "tool_column_profile")
+
+    assert tool is not None
+    assert tool.name == "column_profile"
+
+
+def test_unknown_tool_prefix_does_not_invent_a_tool() -> None:
+    assert registered_tool(inspection_registry(), "tool_not_registered") is None
+
+
+def test_planner_stores_the_registered_name_when_the_model_adds_a_tool_prefix() -> None:
+    dataset = DatasetReference(
+        dataset_id="scores",
+        version="raw-v1",
+        storage_ref="unused.csv",
+        schema={"score": {"datatype": "float"}},
+    )
+    plan = Plan(
+        plan_id="prefixed",
+        objective="Summarize score",
+        analysis_steps=[
+            PlanStep(
+                step_id="summary",
+                tool_name="tool_descriptive_statistics",
+                arguments={"columns": ["score"]},
+            )
+        ],
+    )
+
+    response = run_planner(
+        user_query="Summarize score.",
+        dataset=dataset,
+        conversation_context=[],
+        critique=None,
+        registry=register_preprocessing_tools(default_registry()),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "success"
+    assert response.updates.plan is not None
+    assert response.updates.plan.analysis_steps[0].tool_name == "descriptive_statistics"

@@ -9,7 +9,7 @@
   "functions": {
     "api/**/*.py": {
       "maxDuration": 60,
-      "excludeFiles": "{backend/tests/**,backend/scripts/**,docs/**,**/.venv/**,**/node_modules/**,**/__pycache__/**}"
+      "excludeFiles": "{backend/tests/**,backend/scripts/**,docs/**,**/.venv/**,**/node_modules/**,**/__pycache__/**,**/PIL/**,**/pillow-*.dist-info/**,**/mpl-data/fonts/afm/**,**/mpl-data/sample_data/**,**/ttf/*Mono*,**/ttf/*Serif*,**/ttf/STIX*}"
     }
   }
 }

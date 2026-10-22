@@ -12,6 +12,13 @@ DATASET_ID = "55555555-5555-4555-8555-555555555555"
 CSV = "age,score\n10,\n20,3\n"
 
 
+def test_hosted_figures_can_be_read_back() -> None:
+    from backend.app.services.analysis_request import READABLE_FIGURES
+    from backend.app.tools.visualization.load import HOSTED_ARTIFACTS
+
+    assert HOSTED_ARTIFACTS.resolve() in READABLE_FIGURES
+
+
 def test_analyze_plan_summarizes_the_remaining_row() -> None:
     dataset, path = _dataset()
     try:

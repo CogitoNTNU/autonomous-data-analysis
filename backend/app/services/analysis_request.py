@@ -14,12 +14,13 @@ from backend.app.contracts.state import create_initial_state
 from backend.app.services.plan_payload import load_plan
 from backend.app.services.preprocessing_request import prepare_dataset
 from backend.app.storage.datasets import BACKEND, HOSTED_UPLOADS
-from backend.app.tools.visualization.load import DEFAULT_ARTIFACTS
+from backend.app.tools.visualization.load import DEFAULT_ARTIFACTS, HOSTED_ARTIFACTS
 
 READABLE_FIGURES = (
     DEFAULT_ARTIFACTS.resolve(),
     (BACKEND / "data").resolve(),
     HOSTED_UPLOADS.resolve(),
+    HOSTED_ARTIFACTS.resolve(),
 )
 
 

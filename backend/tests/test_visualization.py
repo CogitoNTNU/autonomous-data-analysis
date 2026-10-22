@@ -51,6 +51,19 @@ def test_each_chart_writes_a_png(tmp_path, monkeypatch):
         assert any(item["code"] == "LOW_SAMPLE_SIZE" for item in payload["warnings"])
 
 
+def test_hosted_chart_is_written_under_tmp(tmp_path, monkeypatch):
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setattr(
+        "backend.app.tools.visualization.figure.HOSTED_ARTIFACTS", tmp_path
+    )
+
+    payload = run_bar(_dataset(), title="Cities", x="city")
+
+    path = Path(payload["artifacts"][0]["storage_ref"])
+    assert path.parent == tmp_path
+    assert path.read_bytes().startswith(b"\x89PNG")
+
+
 def test_bar_chart_records_the_source_result_id(tmp_path):
     payload = run_bar(
         _dataset(),

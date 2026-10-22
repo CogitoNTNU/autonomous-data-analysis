@@ -15,6 +15,7 @@ ALLOWED = (
     HOSTED_UPLOADS.resolve(),
 )
 DEFAULT_ARTIFACTS = BACKEND / "data" / "artifacts"
+HOSTED_ARTIFACTS = Path("/tmp/ada-artifacts")
 SOURCE = "visualization"
 
 

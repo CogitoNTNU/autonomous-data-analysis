@@ -1,0 +1,5 @@
+A server error has occurred
+
+FUNCTION_INVOCATION_FAILED
+
+arn1::7zntc-1792689593984-1f24dc6e1a15

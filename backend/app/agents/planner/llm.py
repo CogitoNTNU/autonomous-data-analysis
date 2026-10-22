@@ -11,7 +11,7 @@ from openai import OpenAI
 from backend.app.agents.planner.agent import PlannerContext
 from backend.app.agents.planner.context import context_message
 from backend.app.agents.planner.schema import PlannerOutput
-from backend.app.tools.registry import ToolRegistry
+from backend.app.tools.registry import ToolRegistry, registered_tool
 
 MAX_TOOL_ROUNDS = 5
 
@@ -77,7 +77,7 @@ class PlannerLLM:
 
             for tool_call in message.tool_calls:
                 tool_name = tool_call.function.name
-                tool = self.inspection_registry.get(tool_name)
+                tool = registered_tool(self.inspection_registry, tool_name)
 
                 if tool is None:
                     raise ValueError(f"Unknown inspection tool: {tool_name}")

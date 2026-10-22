@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,7 +13,11 @@ if TYPE_CHECKING:
 
 from backend.app.contracts.models import Artifact, VisualizationResult, WarningEvent
 from backend.app.tools.visualization.inputs import ChartInput
-from backend.app.tools.visualization.load import DEFAULT_ARTIFACTS, SOURCE
+from backend.app.tools.visualization.load import (
+    DEFAULT_ARTIFACTS,
+    HOSTED_ARTIFACTS,
+    SOURCE,
+)
 
 
 def save_chart(
@@ -22,7 +27,7 @@ def save_chart(
     draw: Callable[[Axes], None],
 ) -> dict[str, object]:
     # png-en lagres utenfor state, bare referansen sendes videre
-    directory = output_dir if output_dir is not None else DEFAULT_ARTIFACTS
+    directory = output_dir if output_dir is not None else _default_directory()
     artifact = _write_png(draw, spec, directory)
     result = VisualizationResult(
         sample_size=sample_size,
@@ -31,6 +36,12 @@ def save_chart(
         warnings=_warnings(sample_size),
     )
     return result.model_dump()
+
+
+def _default_directory() -> Path:
+    if os.getenv("VERCEL"):
+        return HOSTED_ARTIFACTS
+    return DEFAULT_ARTIFACTS
 
 
 def _write_png(
@@ -54,6 +65,8 @@ def _write_png(
 
 
 def _pyplot():
+    os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+    os.environ.setdefault("MPLBACKEND", "Agg")
     import matplotlib
 
     matplotlib.use("Agg")
