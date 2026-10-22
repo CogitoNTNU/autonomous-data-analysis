@@ -6,14 +6,12 @@ import argparse
 import os
 from pprint import pprint
 
-from backend.app.agents.analysis import analysis_node
 from backend.app.agents.planner.llm import PlannerLLM
-from backend.app.agents.planner.node import planner_node
 from backend.app.agents.preprocessing import (
-    preprocessing_node,
     register_preprocessing_tools,
 )
 from backend.app.contracts.state import AgentState, create_initial_state
+from backend.app.graph.nodes import analysis_step, planner_step, preprocessing_step
 from backend.app.storage.datasets import create_dataset_reference
 from backend.app.tools.analysis.descriptive import default_registry
 from backend.app.tools.dataset.inspection import inspection_registry
@@ -66,7 +64,7 @@ def main() -> int:
     registry = register_preprocessing_tools(default_registry())
     state = create_initial_state(args.prompt, dataset)
     state.update(
-        planner_node(
+        planner_step(
             state,
             registry,
             PlannerLLM(inspection_registry=inspection_registry()),
@@ -80,14 +78,12 @@ def main() -> int:
             print("\nPLANNER ERRORS")
             pprint(state["errors"])
         return 1
-    state.update(preprocessing_node(state))
-    analysis_response = analysis_node(state, registry)
-    state["analysis_results"] = analysis_response.updates.analysis_results
-    state["artifacts"] = analysis_response.updates.artifacts
-    state["analysis_execution_report"] = analysis_response.updates.execution_report
-    state["warnings"].extend(analysis_response.warnings)
-    if analysis_response.error is not None:
-        state["errors"].append(analysis_response.error)
+    state.update(preprocessing_step(state))
+    if state["last_node_status"] != "success":
+        _print_state(state)
+        return 1
+    state.update(analysis_step(state, registry))
+    if state["last_node_status"] != "success":
         _print_state(state)
         return 1
     _print_state(state)

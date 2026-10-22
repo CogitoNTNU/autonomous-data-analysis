@@ -77,9 +77,9 @@ def test_planner_node_writes_plan_to_state_updates():
         model=fake_model,
     )
 
-    assert updates["plan"] == plan
-    assert updates["clarification_question"] is None
-    assert updates["warnings"] == []
+    assert updates.updates.plan == plan
+    assert updates.clarification_question is None
+    assert updates.warnings == []
 
 
 def test_planner_node_writes_clarification_to_state_updates():
@@ -105,6 +105,6 @@ def test_planner_node_writes_clarification_to_state_updates():
         model=fake_model,
     )
 
-    assert updates["clarification_question"] == question
-    assert "plan" not in updates
-    assert updates["warnings"] == []
+    assert updates.clarification_question == question
+    assert updates.updates.plan is None
+    assert updates.warnings == []

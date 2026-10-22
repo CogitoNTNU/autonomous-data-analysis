@@ -62,8 +62,8 @@ def test_planner_preprocessing_analysis_share_workflow_contracts():
     state["plan"] = planner_response.updates.plan
 
     updates = preprocessing_node(state)
-    processed_dataset = updates["processed_dataset"]
-    report = updates["preprocessing_report"]
+    processed_dataset = updates.updates.processed_dataset
+    report = updates.updates.preprocessing_report
     output_path = Path(processed_dataset.storage_ref)
 
     try:
@@ -75,7 +75,8 @@ def test_planner_preprocessing_analysis_share_workflow_contracts():
         assert output_path.is_file()
         assert fixture.read_text(encoding="utf-8") == "age,score\n10,1.5\n,2.5\n30,\n"
 
-        state.update(updates)
+        state["processed_dataset"] = processed_dataset
+        state["preprocessing_report"] = report
         analysis_updates = analysis_node(state, registry)
         result = analysis_updates.updates.analysis_results[0]
         assert result.dataset_version == processed_dataset.version
@@ -96,11 +97,11 @@ def test_preprocessing_node_passes_through_dataset_when_plan_has_no_steps():
 
     updates = preprocessing_node(state)
 
-    assert updates["processed_dataset"].storage_ref == str(fixture)
-    assert updates["processed_dataset"].version == dataset.version
-    assert updates["preprocessing_report"].changes == []
-    assert updates["preprocessing_report"].rows_before == 3
-    assert updates["preprocessing_report"].rows_after == 3
+    assert updates.updates.processed_dataset.storage_ref == str(fixture)
+    assert updates.updates.processed_dataset.version == dataset.version
+    assert updates.updates.preprocessing_report.changes == []
+    assert updates.updates.preprocessing_report.rows_before == 3
+    assert updates.updates.preprocessing_report.rows_after == 3
 
 
 def test_change_datatypes_normalizes_datetime_to_supported_date_type():

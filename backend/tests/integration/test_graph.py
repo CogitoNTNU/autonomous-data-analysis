@@ -42,11 +42,15 @@ def test_planner_graph_merges_model_outcome_into_state(outcome: str) -> None:
         "Describe age.", dataset, run_id="graph-test", max_revisions=0
     )
     with patch(
-        "backend.app.graph.builder.preprocessing_node",
+        "backend.app.graph.builder.preprocessing_step",
         return_value={},
     ) as preprocessing:
-        graph = build_graph(registry=default_registry(), planner_model=model)
-        result = graph.invoke(initial_state, config={"recursion_limit": 5})
+        graph = build_graph(
+            registry=default_registry(),
+            planner_model=model,
+            interpretation_model=Mock(),
+        )
+        result = graph.invoke(initial_state, config={"recursion_limit": 10})
 
     if outcome == "success":
         preprocessing.assert_called_once()
@@ -62,7 +66,7 @@ def test_planner_graph_merges_model_outcome_into_state(outcome: str) -> None:
     assert result["analysis_results"] == []
     if outcome == "success":
         assert result["plan"] == plan
-        assert result["errors"] == []
+        assert result["errors"][-1].code == "INVALID_OUTPUT"
         assert result["clarification_question"] is None
     elif outcome == "clarification":
         assert result["plan"] is None
@@ -87,18 +91,20 @@ def test_executor_node_accepts_state(node_name: str) -> None:
     )
     state = create_initial_state("Describe age.", dataset)
     model = Mock()
-    graph = build_graph(registry=default_registry(), planner_model=model)
+    graph = build_graph(
+        registry=default_registry(), planner_model=model, interpretation_model=Mock()
+    )
 
     result = graph.nodes[node_name].invoke(state)
 
     if node_name == "analysis":
-        assert result.status == "error"
-        assert result.error is not None
-        assert result.error.code == "INVALID_DATA"
-        assert result.error.source == "analysis"
+        assert result["last_node_status"] == "error"
+        assert result["errors"]
+        assert result["errors"][-1].code == "INVALID_DATA"
+        assert result["errors"][-1].source == "analysis"
     else:
-        assert len(result["warnings"]) == 1
-        warning = result["warnings"][0]
+        assert len(result["errors"]) == 1
+        warning = result["errors"][0]
         assert warning.code == "INVALID_DATA"
         assert warning.source == "preprocessing"
     model.assert_not_called()

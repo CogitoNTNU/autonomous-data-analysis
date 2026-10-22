@@ -8,11 +8,17 @@ from pathlib import Path
 from backend.app.contracts.errors import AgentError
 from backend.app.contracts.models import (
     AgentName,
-    DatasetReference as WorkflowDatasetReference,
-    PlanStep as WorkflowPlanStep,
-    PreprocessingReport as WorkflowPreprocessingReport,
     PreprocessingUpdates,
     WarningEvent,
+)
+from backend.app.contracts.models import (
+    DatasetReference as WorkflowDatasetReference,
+)
+from backend.app.contracts.models import (
+    PlanStep as WorkflowPlanStep,
+)
+from backend.app.contracts.models import (
+    PreprocessingReport as WorkflowPreprocessingReport,
 )
 from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import AgentState
@@ -101,7 +107,7 @@ def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]
     plan = state["plan"]
     if plan is None:
         return AgentResponse[PreprocessingUpdates](
-            statues="error",
+            status="error",
             updates=PreprocessingUpdates(),
             error=AgentError(
                 code="INVALID_DATA",
@@ -112,7 +118,7 @@ def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]
         )
 
     processed_dataset, report = run_shared_preprocessing(
-        state["dataset"], plan.preprocessing_steps,
+        state["dataset"],
         plan.preprocessing_steps,
     )
 
@@ -125,4 +131,4 @@ def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]
         warnings=report.warnings,
     )
 
-    #TODO produce error handling for more cases like invalid arguments or temporary service failures.
+    # TODO produce error handling for more cases like invalid arguments or temporary service failures.

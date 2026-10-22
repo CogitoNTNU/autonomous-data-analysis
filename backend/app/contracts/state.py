@@ -18,6 +18,7 @@ from .models import (
     RunControl,
     WarningEvent,
 )
+from .responses import ResponseStatus
 
 
 class AgentState(TypedDict):
@@ -36,6 +37,7 @@ class AgentState(TypedDict):
     final_response: FinalResponse | None
     errors: list[AgentError]
     warnings: list[WarningEvent]
+    last_node_status: ResponseStatus | None
     control: RunControl
     clarification_question: str | None
 
@@ -67,6 +69,7 @@ def create_initial_state(
         final_response=None,
         errors=[],
         warnings=[],
+        last_node_status=None,
         control=RunControl(max_revisions=max_revisions),
         clarification_question=None,
     )

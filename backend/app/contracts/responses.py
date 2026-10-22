@@ -7,11 +7,13 @@ from pydantic import Field, model_validator
 from .errors import AgentError
 from .models import ContractModel, NonEmptyString, WarningEvent
 
+ResponseStatus = Literal["success", "needs_clarification", "error"]
+
 UpdatesT = TypeVar("UpdatesT", bound=ContractModel)
 
 
 class AgentResponse(ContractModel, Generic[UpdatesT]):
-    status: Literal["success", "needs_clarification", "error"]
+    status: ResponseStatus
     updates: UpdatesT
     warnings: list[WarningEvent] = Field(default_factory=list)
     error: AgentError | None = None

@@ -123,7 +123,12 @@ class FinalResponse(ContractModel):
 
 class RunControl(ContractModel):
     status: Literal[
-        "pending", "running", "needs_clarification", "completed", "error"
+        "pending",
+        "running",
+        "needs_clarification",
+        "completed",
+        "draft_completed",
+        "error",
     ] = "pending"
     current_agent: AgentName | None = None
     revision_count: int = Field(default=0, ge=0)
