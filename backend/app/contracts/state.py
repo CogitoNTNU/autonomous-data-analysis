@@ -4,13 +4,13 @@ from typing import TypedDict
 from uuid import uuid4
 
 from .errors import AgentError
+from .final_response import FinalResponse
 from .models import (
     AnalysisResult,
     Artifact,
     ConversationMessage,
     Critique,
     DatasetReference,
-    FinalResponse,
     Interpretation,
     Plan,
     PreprocessingReport,

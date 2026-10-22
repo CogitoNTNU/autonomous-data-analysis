@@ -115,12 +115,6 @@ class Critique(ContractModel):
     required_changes: list[str] = Field(default_factory=list)
 
 
-class FinalResponse(ContractModel):
-    text: NonEmptyString
-    artifact_ids: list[str] = Field(default_factory=list)
-    follow_up_suggestions: list[str] = Field(default_factory=list)
-
-
 class RunControl(ContractModel):
     status: Literal[
         "pending", "running", "needs_clarification", "completed", "error"
@@ -150,7 +144,3 @@ class InterpretationUpdates(ContractModel):
 
 class CriticUpdates(ContractModel):
     critique: Critique | None = None
-
-
-class ChatUpdates(ContractModel):
-    final_response: FinalResponse | None = None

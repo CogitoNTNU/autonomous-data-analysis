@@ -1,6 +1,7 @@
 """Present the reviewed interpretation without calculating new results."""
 
-from backend.app.contracts.models import Critique, FinalResponse, Interpretation
+from backend.app.contracts.final_response import FinalResponse
+from backend.app.contracts.models import Critique, Interpretation
 
 
 def run_chat(
