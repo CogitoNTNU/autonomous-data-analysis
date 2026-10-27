@@ -246,6 +246,18 @@ must be columns in the active dataset. A `bar_chart` over raw data calculates
 the mean of `y` for each `x` itself, so it can also visualize an average without
 a separate aggregation step.
 
+Any plan that has analysis steps must include
+at least one chart that fits the data:
+
+- `heatmap` when two columns are categories. This tool counts rows for each pair.
+  It is not a correlation heatmap.
+- `histogram` or `boxplot` for the distribution of one numeric column.
+- `bar_chart` when a number is compared across groups.
+- `scatter_plot` for two numeric columns.
+- `line_chart` when the `x` column is ordered, such as time.
+
+A plan that only cleans the data, with no analysis steps, must not add a chart.
+
 The objective should describe what the analysis is intended to determine,
 not the implementation details.
 
