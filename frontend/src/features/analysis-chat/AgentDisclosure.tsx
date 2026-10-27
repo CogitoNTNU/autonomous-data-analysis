@@ -13,6 +13,7 @@ type AgentDisclosureProps = {
   children: ReactNode;
   actions?: ReactNode;
   detailsTitle?: string;
+  statusBadge?: ReactNode;
 };
 
 export function AgentDisclosure({
@@ -21,6 +22,7 @@ export function AgentDisclosure({
   children,
   actions,
   detailsTitle,
+  statusBadge,
 }: AgentDisclosureProps) {
   const [open, setOpen] = useState(false);
   const detailsId = `${agent.initials.toLowerCase()}-details`;
@@ -37,6 +39,7 @@ export function AgentDisclosure({
           type="button"
         >
           <span className="min-w-0 flex-1">{summary}</span>
+          {statusBadge}
           <ChevronRight
             className={cn(
               "size-3.5 shrink-0 text-muted-foreground transition-transform",

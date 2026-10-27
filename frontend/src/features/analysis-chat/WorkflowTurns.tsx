@@ -37,7 +37,7 @@ export function WorkflowTurns({ session }: { session: Session }) {
   function nextAction(phase: Session["phase"], label: string) {
     return session.phase === phase ? (
       <div className="mt-3 flex justify-end border-t border-border/50 pt-2">
-        <Button variant="ghost" size="sm" className="gap-2 text-sm text-muted-foreground hover:text-foreground" onClick={() => void session.runNextAgent()}>{label}<ArrowRight aria-hidden="true" className="size-3.5" /></Button>
+        <Button variant="ghost" size="sm" className="group gap-2 text-sm text-muted-foreground hover:text-foreground" onClick={() => void session.runNextAgent()}>{label}<ArrowRight aria-hidden="true" className="size-3.5 text-emerald-700/70 transition-colors group-hover:text-emerald-700 group-focus-visible:text-emerald-700 dark:text-emerald-400/70 dark:group-hover:text-emerald-400 dark:group-focus-visible:text-emerald-400" /></Button>
       </div>
     ) : undefined;
   }

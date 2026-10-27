@@ -29,9 +29,9 @@ export function AnalysisPlanCard({ plan, onRun, running = false }: AnalysisPlanC
       actions={
         onRun && (
           <div className="mt-3 flex justify-end border-t border-border/50 pt-2 scroll-mb-48" ref={action}>
-            <Button variant="ghost" size="sm" className="gap-2 text-sm text-muted-foreground hover:text-foreground" disabled={running} onClick={onRun} type="button">
+            <Button variant="ghost" size="sm" className="group gap-2 text-sm text-muted-foreground hover:text-foreground" disabled={running} onClick={onRun} type="button">
               Prepare dataset
-              <ArrowRight aria-hidden="true" className="size-3.5" />
+              <ArrowRight aria-hidden="true" className="size-3.5 text-emerald-700/70 transition-colors group-hover:text-emerald-700 group-focus-visible:text-emerald-700 dark:text-emerald-400/70 dark:group-hover:text-emerald-400 dark:group-focus-visible:text-emerald-400" />
             </Button>
           </div>
         )
