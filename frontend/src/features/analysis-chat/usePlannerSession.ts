@@ -77,6 +77,11 @@ export function usePlannerSession(client: PlannerClient = browserPlanner) {
     setMessages([]);
   }
 
+  function editQuestion(value: string) {
+    resetQuestion();
+    setQuestion(value);
+  }
+
   function replaceDataset() {
     source.current = null;
     setDataset(null);
@@ -253,6 +258,7 @@ export function usePlannerSession(client: PlannerClient = browserPlanner) {
     runPreprocessing,
     resetQuestion,
     replaceDataset,
+    editQuestion,
   };
 }
 

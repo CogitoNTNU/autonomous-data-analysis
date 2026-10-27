@@ -90,6 +90,13 @@ function DatasetConversation({
   dataset: NonNullable<ReturnType<typeof usePlannerSession>["dataset"]>;
   session: ReturnType<typeof usePlannerSession>;
 }) {
+  const editingDisabled = ["thinking", "preprocessing", "analysis", "interpretation", "critic", "chat"].includes(session.phase);
+  function editQuestion(question: string) {
+    session.editQuestion(question);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Analysis question"]')?.focus();
+    });
+  }
   return (
     <>
       <DatasetPreviewPanel
@@ -98,9 +105,9 @@ function DatasetConversation({
       />
       {session.submittedQuestion ? (
         <>
-          <SubmittedQuestion question={session.submittedQuestion} />
+          <SubmittedQuestion question={session.submittedQuestion} onEdit={editQuestion} editDisabled={editingDisabled} />
           {session.clarificationAnswer && (
-            <SubmittedQuestion question={session.clarificationAnswer} />
+            <SubmittedQuestion question={session.clarificationAnswer} onEdit={editQuestion} editDisabled={editingDisabled} />
           )}
           {session.phase === "thinking" && <ThinkingIndicator />}
           {session.plan && <WorkflowTurns session={session} />}
