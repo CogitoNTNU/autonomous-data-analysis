@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  mapAnalysisPayload,
-  mapAnswerPayload,
-  mapCritiquePayload,
-  mapInterpretationPayload,
-} from "@/api/workflow-response";
+import { mapAnalysisPayload } from "@/api/analysis-response";
 
 const result = {
   step_id: "summarize",
@@ -15,7 +10,7 @@ const result = {
   warnings: [{ message: "age n=1" }],
 };
 
-describe("workflow responses", () => {
+describe("mapAnalysisPayload", () => {
   it("describes calculated columns and keeps the raw result", () => {
     const mapped = mapAnalysisPayload({
       status: "success",
@@ -57,43 +52,5 @@ describe("workflow responses", () => {
     });
 
     expect(mapped).toMatchObject({ analysis: { steps: [] } });
-  });
-
-  it("maps an interpretation, a critic decision, and the chat answer", () => {
-    expect(
-      mapInterpretationPayload({
-        status: "success",
-        interpretation: {
-          summary: "One row remains.",
-          findings: [{ claim: "Age is 20.", result_ids: ["summarize"] }],
-          limitations: ["The sample is small."],
-          unanswered_questions: [],
-        },
-      }),
-    ).toMatchObject({
-      interpretation: {
-        summary: "One row remains.",
-        findings: ["Age is 20."],
-        limitations: ["The sample is small."],
-      },
-    });
-    expect(
-      mapCritiquePayload({
-        status: "error",
-        message: "The critic could not review the answer",
-      }),
-    ).toEqual({
-      status: "error",
-      message: "The critic could not review the answer",
-    });
-    expect(
-      mapAnswerPayload({
-        status: "success",
-        answer: { text: "One row remains.", follow_up_suggestions: ["Why?"] },
-      }),
-    ).toEqual({
-      status: "answer",
-      answer: { text: "One row remains.", followUps: ["Why?"] },
-    });
   });
 });

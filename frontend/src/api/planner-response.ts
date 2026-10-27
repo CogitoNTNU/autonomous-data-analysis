@@ -1,6 +1,7 @@
 import type { AnalysisPlan, PlanStep, StoredPlan, StoredPlanStep } from "@/types/planner";
 
-import type { PlannerResult } from "@/api/planner";
+import { isRecord } from "@/api/payload/is-record";
+import type { PlannerResult } from "@/api/planner-client";
 
 type BackendStep = {
   step_id: string;
@@ -129,8 +130,4 @@ function isStep(value: unknown): value is BackendStep {
     typeof value.tool_name === "string" &&
     isRecord(value.arguments)
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

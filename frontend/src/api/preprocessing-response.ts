@@ -1,3 +1,4 @@
+import { isRecord } from "@/api/payload/is-record";
 import type { PreprocessingReport } from "@/types/planner";
 
 export type PreprocessResult =
@@ -61,8 +62,4 @@ function text(value: unknown): string {
     throw new Error("Preprocessing left a required field empty");
   }
   return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
