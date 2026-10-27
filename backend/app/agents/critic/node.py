@@ -21,4 +21,7 @@ def critic_node(
         analysis_results=state["analysis_results"],
         interpretation=state["interpretation"],
         model=model,
+        preprocessing_report=state["preprocessing_report"],
+        analysis_execution_report=state["analysis_execution_report"],
+        warnings=state["warnings"],
     )

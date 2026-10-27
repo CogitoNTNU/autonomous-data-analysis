@@ -69,6 +69,7 @@ def test_route_after_preprocessing_stops_on_error(ready_state):
             retryable=False,
         )
     ]
+    ready_state["last_node_error"] = ready_state["errors"][-1]
 
     assert route_after_preprocessing(ready_state) == "end"
 
@@ -166,5 +167,6 @@ def test_route_after_analysis_stops_on_error(analyzed_state):
             retryable=False,
         )
     ]
+    analyzed_state["last_node_error"] = analyzed_state["errors"][-1]
 
     assert route_after_analysis(analyzed_state) == "end"

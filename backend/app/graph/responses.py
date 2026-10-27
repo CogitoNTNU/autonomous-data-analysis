@@ -19,11 +19,15 @@ from backend.app.contracts.models import (
     PlannerUpdates,
     PreprocessingReport,
     PreprocessingUpdates,
+    RevisionRecord,
     RunControl,
     WarningEvent,
 )
 from backend.app.contracts.responses import AgentResponse, ResponseStatus
 from backend.app.contracts.state import AgentState
+
+from .limits import can_retry
+from .updates import outcome_updates
 
 SupportedUpdates = (
     PlannerUpdates
@@ -37,6 +41,8 @@ UpdatesT = TypeVar("UpdatesT", bound=SupportedUpdates)
 
 class AgentStateUpdate(TypedDict, total=False):
     last_node_status: ResponseStatus
+    last_node_error: AgentError | None
+    revision_history: list[RevisionRecord]
     final_response: None
     plan: Plan | None
     processed_dataset: DatasetReference | None
@@ -78,7 +84,28 @@ def translate_agent_response(
     response: AgentResponse[UpdatesT],
 ) -> AgentStateUpdate:
     source, updates = _map_updates(response.updates)
-    # Preserve invalidation from the draft harness when upstream work is replaced.
+    if response.status == "success":
+        missing = [name for name, value in updates.items() if value is None]
+        if missing:
+            response = AgentResponse(
+                status="error",
+                updates=response.updates,
+                warnings=response.warnings,
+                error=AgentError(
+                    code="INVALID_OUTPUT",
+                    message=f"The {source} response omitted required output.",
+                    source=source,
+                    details={"missing_outputs": missing},
+                ),
+            )
+    outcome = outcome_updates(state, response, agent=source)
+    outcome["warnings"] = _merge_warnings(state, response, source)
+    # A pending retry must see exactly the same domain inputs (including revision
+    # feedback and the previous draft). The active error prevents forward routing.
+    if can_retry(outcome["last_node_error"], outcome["control"]):
+        return {**outcome, "final_response": None}
+
+    # Replaced upstream work invalidates every dependent output.
     if source == "planner":
         updates.update(processed_dataset=None, preprocessing_report=None)
     if source in {"planner", "preprocessing"}:
@@ -87,28 +114,28 @@ def translate_agent_response(
         )
     if source in {"planner", "preprocessing", "analysis"}:
         updates.update(interpretation=None, critique=None)
+        if (
+            response.status == "success"
+            and state["critique"] is not None
+            and state["critique"].decision == "revise"
+        ):
+            # Mixed feedback must still reach downstream Interpretation.
+            updates["critique"] = state["critique"]
     updates["final_response"] = None
-    required_output = {
-        key: value for key, value in _map_updates(response.updates)[1].items()
-    }
-    errors = list(state["errors"])
-    if response.error is not None:
-        errors.append(response.error)
-    if response.status == "success":
-        # Every nullable output mapped above is required for agent success.
-        missing = [name for name, value in required_output.items() if value is None]
-        if missing:
-            errors.append(
-                AgentError(
-                    code="INVALID_OUTPUT",
-                    message=f"The {source} response omitted required output.",
-                    source=source,
-                    details={"missing_outputs": missing},
-                )
-            )
-    if errors:
-        updates["errors"] = errors
+    updates.update(outcome)
+    if not outcome["errors"]:
+        updates.pop("errors", None)
 
+    if source == "interpretation":
+        if response.status != "success":
+            updates["interpretation"] = None
+        updates["critique"] = None
+    return deepcopy(updates)
+
+
+def _merge_warnings(
+    state: AgentState, response: AgentResponse[UpdatesT], source: AgentName
+) -> list[WarningEvent]:
     warnings = list(state["warnings"])
     candidates = response.warnings
     if source == "interpretation":
@@ -123,23 +150,7 @@ def translate_agent_response(
                 for warning in result.warnings
             ),
         ]
-        if response.status != "success":
-            updates["interpretation"] = None
-        updates["critique"] = None
     for warning in candidates:
         if warning not in warnings:
             warnings.append(warning)
-    updates["warnings"] = warnings
-    updates["clarification_question"] = response.clarification_question
-    updates["control"] = state["control"].model_copy(
-        update={
-            "status": "error"
-            if errors
-            else "needs_clarification"
-            if response.status == "needs_clarification"
-            else "running",
-            "current_agent": source,
-        }
-    )
-    updates["last_node_status"] = "error" if errors else response.status
-    return deepcopy(updates)
+    return [warning.model_copy(deep=True) for warning in warnings]

@@ -10,6 +10,7 @@ from backend.app.contracts.state import AgentState
 class RunControlUpdate(TypedDict, total=False):
     control: RunControl
     errors: list[AgentError]
+    last_node_error: AgentError | None
 
 
 def start_run(state: AgentState) -> RunControlUpdate:
@@ -22,7 +23,7 @@ def start_run(state: AgentState) -> RunControlUpdate:
 
 def finish_run(state: AgentState) -> RunControlUpdate:
     updates: RunControlUpdate = {}
-    if state["errors"]:
+    if state["last_node_error"] is not None or state["last_node_status"] == "error":
         status = "error"
     elif state["clarification_question"] is not None:
         status = "needs_clarification"
@@ -39,6 +40,7 @@ def finish_run(state: AgentState) -> RunControlUpdate:
                     retryable=False,
                 ),
             ]
+            updates["last_node_error"] = updates["errors"][-1]
     updates["control"] = state["control"].model_copy(
         update={"status": status, "current_agent": None}
     )

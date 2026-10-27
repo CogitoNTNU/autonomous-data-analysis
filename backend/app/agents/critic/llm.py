@@ -13,6 +13,8 @@ from openai import (
 from backend.app.agents.critic.agent import CriticContext
 from backend.app.contracts.models import Critique
 
+from .context import serialize_context
+
 
 class CriticLLM:
     def __init__(self) -> None:
@@ -21,6 +23,7 @@ class CriticLLM:
         self.client = OpenAI(
             base_url=os.environ["NTNU_LLM_BASE_URL"],
             api_key=os.environ["NTNU_LLM_API_KEY"],
+            max_retries=0,
         )
 
     def __call__(
@@ -28,19 +31,6 @@ class CriticLLM:
         prompt: str,
         context: CriticContext,
     ) -> Critique:
-        payload = {
-            "user_query": context.user_query,
-            "plan": (
-                context.plan.model_dump(mode="json")
-                if context.plan is not None
-                else None
-            ),
-            "analysis_results": [
-                result.model_dump(mode="json") for result in context.analysis_results
-            ],
-            "interpretation": context.interpretation.model_dump(mode="json"),
-        }
-
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -55,7 +45,7 @@ class CriticLLM:
                     },
                     {
                         "role": "user",
-                        "content": json.dumps(payload),
+                        "content": serialize_context(context),
                     },
                 ],
             )

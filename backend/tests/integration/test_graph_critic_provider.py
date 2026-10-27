@@ -1,5 +1,6 @@
 """Real SDK exception types are normalized before reaching graph error handling."""
 
+import json
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -82,7 +83,9 @@ def test_graph_classifies_critic_provider_failures(
         interpretation_model=interpretation,
         critic_model=model,
     )
-    state = create_initial_state("Describe age", pipeline_dataset, max_revisions=2)
+    state = create_initial_state(
+        "Describe age", pipeline_dataset, max_revisions=2, max_retries=0
+    )
 
     result = graph.invoke(state, config={"recursion_limit": 10})
 
@@ -102,3 +105,28 @@ def test_graph_classifies_critic_provider_failures(
         assert error.code == code
         assert error.retryable is retryable
         assert "private" not in error.message
+
+
+def test_critic_provider_receives_independent_execution_evidence(
+    pipeline_dataset, pipeline_registry, pipeline_models, critic_provider
+):
+    model, completion = critic_provider
+    graph = build_graph(
+        pipeline_registry,
+        pipeline_models[0],
+        interpretation_model=pipeline_models[1],
+        critic_model=model,
+    )
+    state = create_initial_state("Describe age", pipeline_dataset)
+
+    result = graph.invoke(state, config={"recursion_limit": 15})
+
+    payload = json.loads(completion.call_args.kwargs["messages"][1]["content"])
+    assert result["control"].status == "completed"
+    assert payload["preprocessing_report"]["rows_before"] == 3
+    assert payload["preprocessing_report"]["rows_after"] == 2
+    assert payload["analysis_execution_report"]["completed_step_ids"] == [
+        "describe-age"
+    ]
+    assert payload["analysis_execution_report"]["outcome"] == "complete"
+    assert "warnings" in payload

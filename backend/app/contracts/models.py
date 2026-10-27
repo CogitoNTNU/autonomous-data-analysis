@@ -115,6 +115,16 @@ class Critique(ContractModel):
     required_changes: list[str] = Field(default_factory=list)
 
 
+class RevisionRecord(ContractModel):
+    """Feedback and evidence references retained when a revision starts."""
+
+    target_agent: Literal["planner", "preprocessing", "analysis", "interpretation"]
+    plan_id: str | None
+    dataset_version: NonEmptyString
+    result_ids: list[str] = Field(default_factory=list)
+    critique: Critique
+
+
 class FinalResponse(ContractModel):
     text: NonEmptyString
     artifact_ids: list[str] = Field(default_factory=list)
@@ -133,6 +143,8 @@ class RunControl(ContractModel):
     current_agent: AgentName | None = None
     revision_count: int = Field(default=0, ge=0)
     max_revisions: int = Field(default=2, ge=0)
+    retry_count: int = Field(default=0, ge=0)
+    max_retries: int = Field(default=2, ge=0)
 
 
 class PlannerUpdates(ContractModel):

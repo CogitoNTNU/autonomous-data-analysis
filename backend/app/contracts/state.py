@@ -15,6 +15,7 @@ from .models import (
     Interpretation,
     Plan,
     PreprocessingReport,
+    RevisionRecord,
     RunControl,
     WarningEvent,
 )
@@ -38,6 +39,8 @@ class AgentState(TypedDict):
     errors: list[AgentError]
     warnings: list[WarningEvent]
     last_node_status: ResponseStatus | None
+    last_node_error: AgentError | None
+    revision_history: list[RevisionRecord]
     control: RunControl
     clarification_question: str | None
 
@@ -49,6 +52,7 @@ def create_initial_state(
     run_id: str | None = None,
     conversation_context: list[ConversationMessage] | None = None,
     max_revisions: int = 2,
+    max_retries: int = 2,
 ) -> AgentState:
     """Create isolated mutable values for each user run."""
     return AgentState(
@@ -70,6 +74,8 @@ def create_initial_state(
         errors=[],
         warnings=[],
         last_node_status=None,
-        control=RunControl(max_revisions=max_revisions),
+        last_node_error=None,
+        revision_history=[],
+        control=RunControl(max_revisions=max_revisions, max_retries=max_retries),
         clarification_question=None,
     )

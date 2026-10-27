@@ -14,6 +14,7 @@ from backend.app.agents.preprocessing import register_preprocessing_tools
 from backend.app.contracts.state import AgentState, create_initial_state
 from backend.app.core.llm_config import load_llm_settings
 from backend.app.graph.builder import build_graph
+from backend.app.graph.limits import workflow_recursion_limit
 from backend.app.storage.datasets import create_dataset_reference
 from backend.app.tools.analysis.descriptive import TOOL
 from backend.app.tools.dataset.inspection import inspection_registry
@@ -36,8 +37,9 @@ def print_outcome(state: AgentState) -> int:
         print("INTERPRETATION — approved by Critic")
         print(draft.model_dump_json(indent=2))
         return 0
-    code = state["errors"][-1].code if state["errors"] else "INCOMPLETE"
-    print(f"Workflow did not produce a draft ({code}).", file=sys.stderr)
+    error = state["last_node_error"]
+    code = error.code if error else "INCOMPLETE"
+    print(f"Workflow did not produce an approved result ({code}).", file=sys.stderr)
     return 1
 
 
@@ -51,11 +53,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--prompt", required=True, help="Question about descriptive statistics"
     )
+    parser.add_argument("--max-revisions", type=int, default=2)
+    parser.add_argument("--max-retries", type=int, default=2)
     args = parser.parse_args(argv)
     try:
         if not args.prompt.strip():
             raise ValueError("An analysis question is required")
         dataset = create_dataset_reference(args.dataset)
+        state = create_initial_state(
+            args.prompt,
+            dataset,
+            max_revisions=args.max_revisions,
+            max_retries=args.max_retries,
+        )
         settings = load_llm_settings(os.environ)
     except (ValueError, OSError):
         print(
@@ -90,10 +100,9 @@ def main(argv: list[str] | None = None) -> int:
                 interpretation_model=interpretation,
                 critic_model=critic,
             )
-            state = create_initial_state(args.prompt, dataset)
             for event in graph.stream(
                 state,
-                config={"recursion_limit": 20},
+                config={"recursion_limit": workflow_recursion_limit(state["control"])},
                 stream_mode="updates",
             ):
                 for node_name, updates in event.items():

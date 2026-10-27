@@ -140,12 +140,9 @@ def test_cannot_complete_preserves_the_structured_blocker(
 @pytest.mark.parametrize(
     "targets",
     [
-        ["planner"],
-        ["preprocessing"],
-        ["analysis"],
         ["critic"],
         ["chat"],
-        ["interpretation", "analysis"],
+        ["interpretation", "chat"],
     ],
 )
 def test_unsupported_revision_targets_do_not_reach_interpretation(
@@ -227,7 +224,9 @@ def test_failed_revision_does_not_reuse_previous_outputs(
         critic.side_effect = [revision_critique]
     else:
         critic.side_effect = [revision_critique, failure("private provider details")]
-    state = create_initial_state("Describe age", pipeline_dataset, max_revisions=2)
+    state = create_initial_state(
+        "Describe age", pipeline_dataset, max_revisions=2, max_retries=0
+    )
 
     result = pipeline_graph.invoke(state, config={"recursion_limit": 16})
 

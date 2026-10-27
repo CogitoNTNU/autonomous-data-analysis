@@ -115,7 +115,15 @@ def test_provider_payload_has_warnings_without_evaluation_labels(monkeypatch) ->
     assert payload["analysis_results"][0]["warnings"][0]["code"] == "HIGH_MISSING_RATE"
     assert payload["analysis_results"][0]["values"]["missing_count"] == 40
     assert payload["interpretation"]["limitations"] == []
-    assert set(payload) == {"user_query", "plan", "analysis_results", "interpretation"}
+    assert set(payload) == {
+        "user_query",
+        "plan",
+        "analysis_results",
+        "interpretation",
+        "preprocessing_report",
+        "analysis_execution_report",
+        "warnings",
+    }
     assert case.name not in json.dumps(payload)
     assert case.review_note not in json.dumps(payload)
 

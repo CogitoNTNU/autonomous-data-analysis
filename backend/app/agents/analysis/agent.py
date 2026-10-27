@@ -127,13 +127,18 @@ def run_analysis(
         failed_step_ids=attempted_failures,
         skipped_step_ids=missing,
     )
+    failed_results = [item for item in results if item.step_id in attempted_failures]
+    retryable = bool(failed_results) and all(
+        isinstance(item.values, dict) and item.values.get("retryable") is True
+        for item in failed_results
+    )
     response = AgentResponse[AnalysisUpdates](
         status="error" if report.outcome == "failed" else "success",
         error=AgentError(
             code="TOOL_FAILURE",
             message="No analysis steps completed successfully; inspect the execution report and result errors.",
             source=SOURCE,
-            retryable=False,
+            retryable=retryable,
         )
         if report.outcome == "failed"
         else None,

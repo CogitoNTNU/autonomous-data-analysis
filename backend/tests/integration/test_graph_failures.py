@@ -7,8 +7,8 @@ from langgraph.graph.state import CompiledStateGraph
 
 from backend.app.contracts.models import (
     AnalysisUpdates,
-    Critique,
     CriticUpdates,
+    Critique,
     DatasetReference,
     Interpretation,
     InterpretationUpdates,
@@ -136,7 +136,9 @@ def test_model_execution_failures_are_structured_without_retries(
 ) -> None:
     failed_model = pipeline_models[1 if node == "interpretation" else 2]
     failed_model.side_effect = failure("private provider details")
-    state = create_initial_state("Describe age", pipeline_dataset, max_revisions=0)
+    state = create_initial_state(
+        "Describe age", pipeline_dataset, max_revisions=0, max_retries=0
+    )
     state["interpretation"] = Interpretation(summary="Old draft")
 
     result = pipeline_graph.invoke(state, config={"recursion_limit": 10})

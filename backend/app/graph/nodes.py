@@ -14,9 +14,11 @@ from backend.app.agents.preprocessing.workflow import preprocessing_node
 from backend.app.contracts.errors import AgentError, ErrorCode
 from backend.app.contracts.models import (
     AgentName,
+    AnalysisUpdates,
     CriticUpdates,
     Critique,
     InterpretationUpdates,
+    PlannerUpdates,
     PreprocessingUpdates,
 )
 from backend.app.contracts.responses import AgentResponse
@@ -30,31 +32,46 @@ from .routes import critique_error
 def planner_graph_node(
     state: AgentState, registry: ToolRegistry, model: PlannerModel
 ) -> AgentStateUpdate:
-    return translate_agent_response(state, planner_node(state, registry, model))
+    try:
+        response = planner_node(deepcopy(state), registry, model)
+    except (ValueError, OSError) as error:
+        response = AgentResponse[PlannerUpdates](
+            status="error",
+            updates=PlannerUpdates(),
+            error=_execution_error(error, "planner"),
+        )
+    return translate_agent_response(state, response)
 
 
 def preprocessing_graph_node(state: AgentState) -> AgentStateUpdate:
     try:
         response = preprocessing_node(state)
     except (ValueError, OSError) as error:
+        diagnostic = _execution_error(error, "preprocessing")
+        if isinstance(error, ValueError):
+            diagnostic = AgentError(
+                code="INVALID_DATA",
+                message="Preprocessing input is invalid.",
+                source="preprocessing",
+            )
         response = AgentResponse[PreprocessingUpdates](
             status="error",
             updates=PreprocessingUpdates(),
-            error=AgentError(
-                code="INVALID_DATA"
-                if isinstance(error, ValueError)
-                else "TOOL_FAILURE",
-                message="Preprocessing input is invalid."
-                if isinstance(error, ValueError)
-                else "Preprocessing could not access dataset storage.",
-                source="preprocessing",
-            ),
+            error=diagnostic,
         )
     return translate_agent_response(state, response)
 
 
 def analysis_graph_node(state: AgentState, registry: ToolRegistry) -> AgentStateUpdate:
-    return translate_agent_response(state, analysis_node(state, registry=registry))
+    try:
+        response = analysis_node(state, registry=registry)
+    except (ValueError, OSError) as error:
+        response = AgentResponse[AnalysisUpdates](
+            status="error",
+            updates=AnalysisUpdates(),
+            error=_execution_error(error, "analysis"),
+        )
+    return translate_agent_response(state, response)
 
 
 def interpretation_graph_node(
@@ -63,23 +80,13 @@ def interpretation_graph_node(
     # The agent reads the previous draft and critique before translation clears them.
     try:
         response = interpretation_node(state, model=model)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - model boundary emits safe structured failures
         response = AgentResponse[InterpretationUpdates](
             status="error",
             updates=InterpretationUpdates(interpretation=None),
             error=_execution_error(error, "interpretation"),
         )
-    updates = translate_agent_response(state, response)
-    critique = state["critique"]
-    if (
-        state["control"].current_agent == "critic"
-        and critique is not None
-        and critique.decision == "revise"
-    ):
-        updates["control"] = updates["control"].model_copy(
-            update={"revision_count": state["control"].revision_count + 1}
-        )
-    return updates
+    return translate_agent_response(state, response)
 
 
 def critic_graph_node(state: AgentState, model: CriticModel) -> AgentStateUpdate:
@@ -105,15 +112,15 @@ def critic_graph_node(state: AgentState, model: CriticModel) -> AgentStateUpdate
                 warnings=response.warnings,
                 error=diagnostic,
             )
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - model boundary emits safe structured failures
         response = AgentResponse[CriticUpdates](
             status="error",
             updates=CriticUpdates(),
             error=_execution_error(error, "critic"),
         )
     updates = translate_agent_response(state, response)
-    critique = updates["critique"]
-    errors = updates.get("errors", state["errors"])
+    critique = updates.get("critique")
+    error = updates["last_node_error"]
     logging.getLogger(__name__).info(
         "critic.reviewed",
         extra={
@@ -121,7 +128,7 @@ def critic_graph_node(state: AgentState, model: CriticModel) -> AgentStateUpdate
             "node": "critic",
             "critic_decision": critique.decision if critique is not None else None,
             "revision_count": state["control"].revision_count,
-            "error_category": errors[-1].code if errors else None,
+            "error_category": error.code if error else None,
         },
     )
     return updates

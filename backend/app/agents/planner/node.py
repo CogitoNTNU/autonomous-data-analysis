@@ -1,10 +1,10 @@
 """State adapter for the Planner Agent."""
 
 from backend.app.agents.planner.agent import PlannerModel, run_planner
+from backend.app.contracts.models import PlannerUpdates
+from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import AgentState
 from backend.app.tools.registry import ToolRegistry
-from backend.app.contracts.responses import AgentResponse
-from backend.app.contracts.models import PlannerUpdates
 
 
 def planner_node(
@@ -21,4 +21,5 @@ def planner_node(
         critique=state["critique"],
         registry=registry,
         model=model,
+        previous_plan=state["plan"],
     )

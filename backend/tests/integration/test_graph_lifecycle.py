@@ -52,6 +52,7 @@ def test_finish_records_missing_output(state):
 def test_finish_preserves_existing_error(state):
     error = AgentError(code="INVALID_DATA", message="Failed.", source="preprocessing")
     state["errors"] = [error]
+    state["last_node_error"] = error
     state["clarification_question"] = "Old question?"
     updates = finish_run(state)
     assert updates["control"].status == "error"

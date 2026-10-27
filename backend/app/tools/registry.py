@@ -117,6 +117,15 @@ def execute_step(
             dataset,
             "TIMEOUT",
             f"Tool {step.tool_name} exceeded the {timeout_seconds:.1f}s step budget",
+            retryable=True,
+        )
+    except ConnectionError:
+        return fail(
+            step,
+            dataset,
+            "TOOL_FAILURE",
+            "The tool connection is temporarily unavailable.",
+            retryable=True,
         )
     except Exception as exc:  # noqa: BLE001 - tool failures become structured results
         return fail(step, dataset, "TOOL_FAILURE", str(exc) or type(exc).__name__)
@@ -249,12 +258,23 @@ def parse_artifacts(raw: object) -> list[Artifact]:
 
 
 def fail(
-    step: PlanStep, dataset: DatasetReference, code: WarningCode, message: str
+    step: PlanStep,
+    dataset: DatasetReference,
+    code: WarningCode,
+    message: str,
+    *,
+    retryable: bool = False,
 ) -> AnalysisResult:
     warning = WarningEvent(
         code=code, message=message, source=SOURCE, step_id=step.step_id
     )
-    return result(step, dataset, {"error": message, "code": code}, 0, [warning])
+    return result(
+        step,
+        dataset,
+        {"error": message, "code": code, "retryable": retryable},
+        0,
+        [warning],
+    )
 
 
 def result(

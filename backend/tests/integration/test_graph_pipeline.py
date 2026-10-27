@@ -216,7 +216,9 @@ def test_interpretation_failure_clears_old_draft_and_skips_critic(
     failure: Exception,
 ) -> None:
     pipeline_models[1].side_effect = failure
-    state = create_initial_state("Describe age", pipeline_dataset, max_revisions=0)
+    state = create_initial_state(
+        "Describe age", pipeline_dataset, max_revisions=0, max_retries=0
+    )
     state["interpretation"] = Interpretation(summary="Old draft")
     state["critique"] = Critique(decision="approved")
 

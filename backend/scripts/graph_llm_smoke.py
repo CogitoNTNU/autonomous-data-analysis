@@ -26,6 +26,7 @@ from backend.app.contracts.models import Finding, Interpretation
 from backend.app.contracts.state import AgentState, create_initial_state
 from backend.app.core.llm_config import LLMSettings, load_llm_settings
 from backend.app.graph.builder import build_graph
+from backend.app.graph.limits import workflow_recursion_limit
 from backend.app.storage.datasets import create_dataset_reference
 from backend.app.tools.analysis.descriptive import default_registry
 from backend.app.tools.dataset.inspection import inspection_registry
@@ -83,7 +84,7 @@ def execute_graph(graph: CompiledStateGraph, state: AgentState) -> SmokeRun:
         for kind, payload in graph.stream(
             state,
             stream_mode=["updates", "values"],
-            config={"recursion_limit": 10 + 2 * state["control"].max_revisions},
+            config={"recursion_limit": workflow_recursion_limit(state["control"])},
         ):
             if kind == "values":
                 run.state = payload
@@ -96,7 +97,7 @@ def execute_graph(graph: CompiledStateGraph, state: AgentState) -> SmokeRun:
                         run.decisions.append(
                             critique.decision if critique is not None else "no critique"
                         )
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - smoke diagnostics must not expose provider bodies
         # Provider exceptions can contain credentials or response bodies.
         run.exception_type = type(error).__name__
     return run
@@ -160,7 +161,7 @@ def smoke_passed(run: SmokeRun, valid_draft: bool) -> bool:
     critique = state["critique"]
     return (
         run.exception_type is None
-        and run.path[:6]
+        and list(dict.fromkeys(run.path))[:6]
         == [
             "start_run",
             "planner",
@@ -171,7 +172,7 @@ def smoke_passed(run: SmokeRun, valid_draft: bool) -> bool:
         ]
         and run.path[-1:] == ["finish_run"]
         and state["control"].status == "completed"
-        and not state["errors"]
+        and state["last_node_error"] is None
         and valid_draft
         and critique is not None
         and critique.decision == "approved"
@@ -274,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_revisions=args.max_revisions,
                 controlled=args.controlled_revision,
             )
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - report setup failure without provider details
         print(f"Smoke setup failed ({type(error).__name__}).")
         return 1
     valid_draft = valid_interpretation(run.state)

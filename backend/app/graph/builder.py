@@ -1,4 +1,4 @@
-"""Build the analysis pipeline with bounded Critic feedback to Interpretation."""
+"""Build the pipeline with targeted Critic revisions and per-operation retries."""
 
 from functools import partial
 
@@ -35,7 +35,7 @@ def build_graph(
     interpretation_model: InterpretationModel,
     critic_model: CriticModel,
 ) -> CompiledStateGraph:
-    """Inject models and revise only Interpretation within the state's revision limit."""
+    """Inject models; all revision and retry budgets come from the run's state."""
     builder = StateGraph(AgentState)
     builder.add_node("start_run", start_run)
     builder.add_node("finish_run", finish_run)
@@ -53,27 +53,38 @@ def build_graph(
     builder.add_conditional_edges(
         "planner",
         route_after_planner,
-        {"preprocessing": "preprocessing", "end": "finish_run"},
+        {"planner": "planner", "preprocessing": "preprocessing", "end": "finish_run"},
     )
     builder.add_conditional_edges(
         "preprocessing",
         route_after_preprocessing,
-        {"analysis": "analysis", "end": "finish_run"},
+        {"preprocessing": "preprocessing", "analysis": "analysis", "end": "finish_run"},
     )
     builder.add_conditional_edges(
         "analysis",
         route_after_analysis,
-        {"interpretation": "interpretation", "end": "finish_run"},
+        {
+            "analysis": "analysis",
+            "interpretation": "interpretation",
+            "end": "finish_run",
+        },
     )
     builder.add_conditional_edges(
         "interpretation",
         route_after_interpretation,
-        {"critic": "critic", "end": "finish_run"},
+        {"interpretation": "interpretation", "critic": "critic", "end": "finish_run"},
     )
     builder.add_conditional_edges(
         "critic",
         route_after_critic,
-        {"interpretation": "interpretation", "end": "finish_run"},
+        {
+            "planner": "planner",
+            "preprocessing": "preprocessing",
+            "analysis": "analysis",
+            "interpretation": "interpretation",
+            "critic": "critic",
+            "end": "finish_run",
+        },
     )
     builder.add_edge("finish_run", END)
     return builder.compile()
