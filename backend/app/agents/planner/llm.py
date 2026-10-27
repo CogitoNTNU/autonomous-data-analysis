@@ -6,7 +6,12 @@ import json
 import os
 from typing import Any
 
-from openai import OpenAI
+from openai import (
+    APIConnectionError,
+    APIResponseValidationError,
+    APITimeoutError,
+    OpenAI,
+)
 
 from backend.app.agents.planner.agent import PlannerContext
 from backend.app.agents.planner.context import context_message
@@ -26,6 +31,7 @@ class PlannerLLM:
         self.client = OpenAI(
             base_url=os.environ["NTNU_LLM_BASE_URL"],
             api_key=os.environ["NTNU_LLM_API_KEY"],
+            max_retries=0,
         )
 
     def __call__(
@@ -51,11 +57,20 @@ class PlannerLLM:
         tools = self._inspection_tools()
 
         for _ in range(MAX_TOOL_ROUNDS):
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                tools=tools,
-            )
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    tools=tools,
+                )
+            except APITimeoutError as error:
+                raise TimeoutError("The Planner model timed out.") from error
+            except APIConnectionError as error:
+                raise ConnectionError("The Planner provider is unreachable.") from error
+            except APIResponseValidationError as error:
+                raise ValueError(
+                    "The Planner provider returned an invalid response."
+                ) from error
 
             message = response.choices[0].message
 

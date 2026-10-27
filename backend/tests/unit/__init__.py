@@ -1,0 +1,1 @@
+"""Isolated application unit tests."""

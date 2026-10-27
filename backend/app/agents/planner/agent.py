@@ -32,6 +32,7 @@ class PlannerContext:
     conversation_context: list[ConversationMessage]
     critique: Critique | None
     available_tools: list[dict[str, Any]]
+    previous_plan: Plan | None = None
 
 
 PlannerModel = Callable[
@@ -47,6 +48,8 @@ def run_planner(
     critique: Critique | None,
     registry: ToolRegistry,
     model: PlannerModel,
+    *,
+    previous_plan: Plan | None = None,
 ) -> AgentResponse[PlannerUpdates]:
     """Create and validate a plan or return a clarification response."""
 
@@ -56,6 +59,7 @@ def run_planner(
         conversation_context=conversation_context,
         critique=critique,
         available_tools=registry.list_tools(),
+        previous_plan=previous_plan,
     )
 
     prompt = PROMPT_PATH.read_text(encoding="utf-8")

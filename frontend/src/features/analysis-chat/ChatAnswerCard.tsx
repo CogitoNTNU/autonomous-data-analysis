@@ -13,6 +13,7 @@ export function ChatAnswerCard({
 }) {
   return (
     <AgentDisclosure
+      defaultOpen
       agent={agents.chat}
       detailsTitle="Final answer"
       summary="Prepared an answer"

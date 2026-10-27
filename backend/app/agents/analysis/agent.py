@@ -1,7 +1,9 @@
 """Deterministic Analysis Agent (cogito.txt §9.3)."""
 
 from backend.app.agents.analysis.schema import EngineResult
+from backend.app.contracts.errors import AgentError
 from backend.app.contracts.models import (
+    AnalysisExecutionReport,
     AnalysisResult,
     AnalysisUpdates,
     Artifact,
@@ -43,17 +45,30 @@ def run_analysis(
             f"preprocessing {preprocessing_report.rows_before}->{preprocessing_report.rows_after}"
         )
     try:
+        if not analysis_steps:
+            raise ValueError("Analysis requires at least one step")
         order = order_steps(analysis_steps)
     except ValueError as exc:
         warning = WarningEvent(code="INVALID_DATA", message=str(exc), source=SOURCE)
         empty = AgentResponse(
-            status="success", updates=AnalysisUpdates(), warnings=[warning]
+            status="error",
+            updates=AnalysisUpdates(
+                execution_report=AnalysisExecutionReport(outcome="failed")
+            ),
+            warnings=[warning],
+            error=AgentError(
+                code="INVALID_DATA",
+                message="Analysis plan is empty or has invalid dependencies.",
+                source=SOURCE,
+            ),
         )
         return EngineResult(
             empty, [step.step_id for step in analysis_steps], [str(exc)]
         )
     by_id = {step.step_id: step for step in analysis_steps}
     failed: set[str] = set()
+    completed: list[str] = []
+    attempted_failures: list[str] = []
     results: list[AnalysisResult] = []
     warnings: list[WarningEvent] = []
     missing: list[str] = []
@@ -97,12 +112,39 @@ def run_analysis(
         warnings.extend(item.warnings)
         if isinstance(item.values, dict) and item.values.get("status") == "failed":
             failed.add(step_id)
+            attempted_failures.append(step_id)
             log.append(f"failed {step_id}")
         else:
+            completed.append(step_id)
             log.append(f"ok {step_id}")
-    response = AgentResponse(
-        status="success",
-        updates=AnalysisUpdates(analysis_results=results, artifacts=artifacts),
+    report = AnalysisExecutionReport(
+        outcome="failed"
+        if not completed
+        else "partial"
+        if attempted_failures or missing
+        else "complete",
+        completed_step_ids=completed,
+        failed_step_ids=attempted_failures,
+        skipped_step_ids=missing,
+    )
+    failed_results = [item for item in results if item.step_id in attempted_failures]
+    retryable = bool(failed_results) and all(
+        isinstance(item.values, dict) and item.values.get("retryable") is True
+        for item in failed_results
+    )
+    response = AgentResponse[AnalysisUpdates](
+        status="error" if report.outcome == "failed" else "success",
+        error=AgentError(
+            code="TOOL_FAILURE",
+            message="No analysis steps completed successfully; inspect the execution report and result errors.",
+            source=SOURCE,
+            retryable=retryable,
+        )
+        if report.outcome == "failed"
+        else None,
+        updates=AnalysisUpdates(
+            analysis_results=results, artifacts=artifacts, execution_report=report
+        ),
         warnings=warnings,
     )
     return EngineResult(response, missing, log)
@@ -120,8 +162,7 @@ def _source_result_problem(
             for result in results
             if result.result_id == source_result_id
             or (
-                result.step_id == source_result_id
-                and result.step_id in step.depends_on
+                result.step_id == source_result_id and result.step_id in step.depends_on
             )
         ),
         None,

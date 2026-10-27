@@ -102,6 +102,11 @@ def test_step_is_skipped_when_dependency_fails():
     assert engine.missing_steps == ["b"]
     assert ids == ["a", "c"]
     assert engine.response.status == "success"
+    report = engine.response.updates.execution_report
+    assert report.outcome == "partial"
+    assert report.completed_step_ids == ["c"]
+    assert report.failed_step_ids == ["a"]
+    assert report.skipped_step_ids == ["b"]
     assert engine.execution_log
     assert any("skipped b" in line for line in engine.execution_log)
     assert any(

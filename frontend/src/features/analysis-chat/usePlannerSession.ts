@@ -1,291 +1,123 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import type { PlannerClient, PlannerMessage, PlannerResult } from "@/api/planner";
-import { browserPlanner } from "@/api/planner";
-import {
-  continueReviewedPlan,
-  type ContinueUpdate,
-} from "@/features/analysis-chat/continue-reviewed-plan";
-import { agents, type AgentIdentity } from "@/features/analysis-chat/agents";
-import { readCsvText } from "@/features/dataset-upload/read-csv-preview";
+import { browserWorkflow, type WorkflowClient, type WorkflowSnapshot } from "@/api/workflows";
+import { agents } from "@/features/analysis-chat/agents";
 import type { DatasetPreview } from "@/types/dataset";
-import type {
-  AnalysisPlan,
-  AnalysisReport,
-  ChatAnswer,
-  ClarificationOption,
-  ClarificationRequest,
-  CritiqueView,
-  InterpretationView,
-  PreprocessingReport,
-} from "@/types/planner";
+import type { ClarificationOption, ClarificationRequest } from "@/types/planner";
 
-export type PlannerPhase =
-  | "analysis_ready"
-  | "interpretation_ready"
-  | "critic_ready"
-  | "chat_ready"
-  | "idle"
-  | "thinking"
-  | "clarification"
-  | "clarification_input"
-  | "plan"
-  | "preprocessing"
-  | "analysis"
-  | "interpretation"
-  | "critic"
-  | "chat"
-  | "complete"
-  | "error";
-
+export type PlannerPhase = "idle" | "thinking" | "clarification" | "clarification_input" | "preprocessing" | "analysis" | "interpretation" | "critic" | "chat" | "complete" | "error";
 type LoadedDataset = DatasetPreview & { datasetId: string };
 
-export function usePlannerSession(client: PlannerClient = browserPlanner) {
-  const source = useRef<{ file: File; dataset: LoadedDataset } | null>(null);
+export function usePlannerSession(client: WorkflowClient = browserWorkflow) {
+  const source = useRef<LoadedDataset | null>(null);
   const [dataset, setDataset] = useState<LoadedDataset | null>(null);
   const [question, setQuestion] = useState("");
   const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(null);
+  const [clarificationAnswer, setClarificationAnswer] = useState<string | null>(null);
+  const [workflow, setWorkflow] = useState<WorkflowSnapshot | null>(null);
   const [phase, setPhase] = useState<PlannerPhase>("idle");
-  const [clarification, setClarification] = useState<ClarificationRequest | null>(
-    null,
-  );
-  const [clarificationAnswer, setClarificationAnswer] = useState<string | null>(
-    null,
-  );
-  const [plan, setPlan] = useState<AnalysisPlan | null>(null);
-  const [report, setReport] = useState<PreprocessingReport | null>(null);
-  const [analysis, setAnalysis] = useState<AnalysisReport | null>(null);
-  const [interpretation, setInterpretation] = useState<InterpretationView | null>(null);
-  const [critique, setCritique] = useState<CritiqueView | null>(null);
-  const [answer, setAnswer] = useState<ChatAnswer | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [errorAgent, setErrorAgent] = useState<AgentIdentity>(agents.planner);
-  const run = useRef(0);
-  const [messages, setMessages] = useState<PlannerMessage[]>([]);
+  const active = useRef<{ controller: AbortController; timer?: ReturnType<typeof setTimeout> } | null>(null);
+  const upload = useRef(0);
+
+  function cancelRequests() {
+    active.current?.controller.abort();
+    clearTimeout(active.current?.timer);
+    active.current = null;
+  }
+  useEffect(() => () => { cancelRequests(); upload.current += 1; }, []);
 
   function resetQuestion() {
+    cancelRequests();
     setQuestion("");
     setSubmittedQuestion(null);
-    setPhase("idle");
-    setClarification(null);
     setClarificationAnswer(null);
-    setPlan(null);
-    setReport(null);
-    setAnalysis(null);
-    setInterpretation(null);
-    setCritique(null);
-    setAnswer(null);
+    setWorkflow(null);
     setError(null);
-    setErrorAgent(agents.planner);
-    run.current += 1;
-    setMessages([]);
+    setPhase("idle");
   }
-
-  function editQuestion(value: string) {
-    resetQuestion();
-    setQuestion(value);
-  }
-
+  function editQuestion(value: string) { resetQuestion(); setQuestion(value); }
   function replaceDataset() {
+    upload.current += 1;
     source.current = null;
     setDataset(null);
     resetQuestion();
   }
-
   async function acceptDataset(preview: DatasetPreview, file: File) {
+    const id = ++upload.current;
     try {
       const registered = await client.registerDataset(file);
+      if (id !== upload.current) return false;
       resetQuestion();
       const loaded = { ...preview, datasetId: registered.dataset_id };
-      source.current = { file, dataset: loaded };
+      source.current = loaded;
       setDataset(loaded);
       return true;
     } catch (reason: unknown) {
-      setError(messageFrom(reason));
+      if (id === upload.current) setError(messageFrom(reason));
       return false;
     }
   }
 
-  function submitQuestion(nextQuestion: string) {
-    if (phase === "clarification_input") {
-      setClarificationAnswer(nextQuestion);
-      setQuestion("");
-      void requestPlan(nextQuestion, messages);
-      return;
-    }
-    setSubmittedQuestion(nextQuestion);
+  function observe(result: WorkflowSnapshot, controller: AbortController) {
+    if (controller.signal.aborted) return;
+    setWorkflow(result);
+    setError(result.error);
+    if (result.status === "error") { setPhase("error"); return; }
+    if (result.status === "completed") { setPhase("complete"); return; }
+    if (result.status === "needs_clarification") { setPhase("clarification_input"); return; }
+    setPhase(result.activeAgent && result.activeAgent !== "planner" ? result.activeAgent : "thinking");
+    if (active.current) active.current.timer = setTimeout(() => {
+      void client.status(result.runId, controller.signal)
+        .then((next) => observe(next, controller))
+        .catch((reason: unknown) => fail(reason, controller));
+    }, 750);
+  }
+  function fail(reason: unknown, controller: AbortController) {
+    if (controller.signal.aborted) return;
+    setError(messageFrom(reason));
+    setPhase("error");
+  }
+  function submitQuestion(value: string) {
+    const current = source.current;
+    if (!current || !value.trim()) return;
+    const clarifying = phase === "clarification_input" && workflow?.status === "needs_clarification";
+    cancelRequests();
+    const controller = new AbortController();
+    active.current = { controller };
     setQuestion("");
-    setClarification(null);
-    setClarificationAnswer(null);
-    setPlan(null);
-    void requestPlan(nextQuestion, []);
-  }
-
-  function answerClarification(option: ClarificationOption) {
-    if (option.id === "custom") {
-      setQuestion("By largest, I mean ");
-      setPhase("clarification_input");
-      return;
-    }
-    setClarificationAnswer(option.label);
-    void requestPlan(option.label, messages);
-  }
-
-  async function requestPlan(query: string, history: PlannerMessage[]) {
-    const current = source.current;
-    if (!current) {
-      return;
-    }
+    setError(null);
     setPhase("thinking");
-    setError(null);
-    try {
-      applyResult(
-        await client.ask({
-          datasetId: current.dataset.datasetId,
-          question: query,
-          messages: history,
-          columns: current.dataset.columns,
-          csv: await readCsvText(current.file),
-        }),
-        query,
-        history,
-      );
-    } catch (reason: unknown) {
-      setError(messageFrom(reason));
-      setPhase("error");
+    if (clarifying && workflow) {
+      setClarificationAnswer(value);
+      void client.resume({ runId: workflow.runId, checkpointId: workflow.checkpointId, answer: value }, controller.signal)
+        .then((result) => observe(result, controller)).catch((reason: unknown) => fail(reason, controller));
+    } else {
+      setWorkflow(null);
+      setClarificationAnswer(null);
+      setSubmittedQuestion(value);
+      void client.start({ datasetId: current.datasetId, question: value, columns: current.columns }, controller.signal)
+        .then((result) => observe(result, controller)).catch((reason: unknown) => fail(reason, controller));
     }
   }
-
-  function applyResult(
-    result: PlannerResult,
-    query: string,
-    history: PlannerMessage[],
-  ) {
-    if (result.status === "plan") {
-      setPlan(result.plan);
-      setPhase("plan");
-      return;
-    }
-    if (result.status === "error") {
-      setError(result.message);
-      setPhase("error");
-      return;
-    }
-    setClarification(result.clarification);
-    setMessages([
-      ...history,
-      { role: "user", content: query },
-      { role: "assistant", content: result.clarification.question },
-    ]);
-    setPhase(hasChoices(result.clarification) ? "clarification" : "clarification_input");
+  function answerClarification(option: ClarificationOption) {
+    if (option.id === "custom") { setPhase("clarification_input"); return; }
+    submitQuestion(option.label);
   }
-
-  async function runNextAgent() {
-    const current = source.current;
-    if (!current || !plan) {
-      return;
-    }
-    const nextStage = {
-      plan: "preprocessing",
-      analysis_ready: "analysis",
-      interpretation_ready: "interpretation",
-      critic_ready: "critic",
-      chat_ready: "chat",
-    } as const;
-    const stage = nextStage[phase as keyof typeof nextStage];
-    if (!stage) return;
-    const id = ++run.current;
-    setPhase(stage);
-    setError(null);
-    const question = clarificationAnswer ?? submittedQuestion ?? plan.objective;
-    try {
-      await continueReviewedPlan(
-        client,
-        {
-          datasetId: current.dataset.datasetId,
-          csv: await readCsvText(current.file),
-          plan: plan.source,
-          question,
-          results: analysis?.results ?? [],
-          artifacts: analysis?.artifacts ?? [],
-        },
-        (update) => {
-          if (run.current === id) {
-            applyContinue(update);
-          }
-        },
-        stage,
-        interpretation,
-        critique,
-      );
-    } catch (reason: unknown) {
-      if (run.current !== id) {
-        return;
-      }
-      setError(messageFrom(reason));
-      setErrorAgent(agents[stage]);
-      setPhase("error");
-    }
-  }
-
-  function applyContinue(update: ContinueUpdate) {
-    if (update.phase === "error") {
-      setError(update.message);
-      setErrorAgent(update.agent);
-      setPhase("error");
-      return;
-    }
-    if (update.phase === "analysis_ready") {
-      setReport(update.report);
-    }
-    if (update.phase === "interpretation_ready") {
-      setAnalysis(update.analysis);
-    }
-    if (update.phase === "critic_ready") {
-      setInterpretation(update.interpretation);
-    }
-    if (update.phase === "chat_ready") {
-      setCritique(update.critique);
-    }
-    if (update.phase === "complete") {
-      setAnswer(update.answer);
-    }
-    setPhase(update.phase);
-  }
-
+  const clarification: ClarificationRequest | null = workflow?.question ? {
+    reason: "missing_information", question: workflow.question,
+    description: "Answer in the message field so the analysis can proceed.", options: [],
+  } : null;
   return {
-    dataset,
-    question,
-    setQuestion,
-    submittedQuestion,
-    phase,
-    clarification,
-    clarificationAnswer,
-    plan,
-    report,
-    analysis,
-    interpretation,
-    critique,
-    answer,
-    error,
-    errorAgent,
-    acceptDataset,
-    submitQuestion,
-    answerClarification,
-    runNextAgent,
-    resetQuestion,
-    replaceDataset,
-    editQuestion,
+    dataset, question, setQuestion, submittedQuestion, phase, clarification, clarificationAnswer,
+    plan: workflow?.plan ?? null, report: workflow?.report ?? null, analysis: workflow?.analysis ?? null,
+    interpretation: workflow?.interpretation ?? null, critique: workflow?.critique ?? null, answer: workflow?.answer ?? null,
+    error, errorAgent: agents[workflow?.activeAgent ?? "planner"],
+    busy: ["thinking", "preprocessing", "analysis", "interpretation", "critic", "chat"].includes(phase),
+    acceptDataset, submitQuestion, answerClarification, resetQuestion, replaceDataset, editQuestion,
   };
 }
 
-function hasChoices(clarification: ClarificationRequest): boolean {
-  return clarification.options.some((option) => option.id !== "custom");
-}
-
 function messageFrom(reason: unknown): string {
-  if (reason instanceof Error && reason.message.trim()) {
-    return reason.message;
-  }
-  return "The planner could not be reached";
+  return reason instanceof Error && reason.message.trim() ? reason.message : "The workflow could not be reached";
 }

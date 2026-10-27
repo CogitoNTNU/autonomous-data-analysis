@@ -9,7 +9,7 @@ import { WorkflowTurns } from "@/features/analysis-chat/WorkflowTurns";
 import { SubmittedQuestion } from "@/features/analysis-chat/SubmittedQuestion";
 import { ThinkingIndicator } from "@/features/analysis-chat/ThinkingIndicator";
 import { usePlannerSession } from "@/features/analysis-chat/usePlannerSession";
-import type { PlannerClient } from "@/api/planner";
+import type { WorkflowClient } from "@/api/workflows";
 import { DatasetPreviewPanel } from "@/features/dataset-preview/DatasetPreviewPanel";
 import { DatasetUpload } from "@/features/dataset-upload/DatasetUpload";
 import { AppSidebar } from "@/features/workspace/AppSidebar";
@@ -17,24 +17,14 @@ import { WorkspaceHeader } from "@/features/workspace/WorkspaceHeader";
 import { useTheme } from "@/features/workspace/use-theme";
 
 type AppProps = {
-  planner?: PlannerClient;
+  planner?: WorkflowClient;
 };
 
 export function App({ planner }: AppProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { theme, toggleTheme } = useTheme();
   const session = usePlannerSession(planner);
-  const waiting =
-    session.phase === "thinking" ||
-    session.phase.endsWith("_ready") ||
-    session.phase === "plan" ||
-    session.phase === "preprocessing" ||
-    session.phase === "analysis" ||
-    session.phase === "interpretation" ||
-    session.phase === "critic" ||
-    session.phase === "chat" ||
-    session.phase === "complete" ||
-    session.phase === "clarification";
+  const waiting = session.busy || session.phase === "complete" || session.phase === "clarification";
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">

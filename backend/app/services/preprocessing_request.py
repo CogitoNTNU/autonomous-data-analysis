@@ -5,7 +5,6 @@ from backend.app.contracts.models import (
     DatasetReference,
     Plan,
     PreprocessingReport,
-    WarningEvent,
 )
 from backend.app.contracts.state import create_initial_state
 from backend.app.services.plan_payload import load_plan
@@ -25,20 +24,10 @@ def prepare_dataset(
 ) -> tuple[DatasetReference, PreprocessingReport]:
     state = create_initial_state(plan.objective, dataset)
     state["plan"] = plan
-    updates = preprocessing_node(state)
-    processed = updates.get("processed_dataset")
-    report = updates.get("preprocessing_report")
-    if not isinstance(processed, DatasetReference) or not isinstance(
-        report, PreprocessingReport
-    ):
-        raise ValueError(_failure(updates))
+    response = preprocessing_node(state)
+    processed = response.updates.processed_dataset
+    report = response.updates.preprocessing_report
+    if response.status != "success" or processed is None or report is None:
+        message = response.error.message if response.error is not None else ""
+        raise ValueError(message or "Preprocessing could not run")
     return processed, report
-
-
-def _failure(updates: dict[str, object]) -> str:
-    warnings = updates.get("warnings")
-    if isinstance(warnings, list):
-        for warning in warnings:
-            if isinstance(warning, WarningEvent) and warning.message:
-                return warning.message
-    return "Preprocessing could not run"

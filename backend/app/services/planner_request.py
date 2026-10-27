@@ -2,7 +2,12 @@
 
 from backend.app.agents.planner.agent import PlannerModel
 from backend.app.agents.planner.node import planner_node
-from backend.app.contracts.models import ConversationMessage, DatasetReference
+from backend.app.contracts.models import (
+    ConversationMessage,
+    DatasetReference,
+    PlannerUpdates,
+)
+from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import create_initial_state
 from backend.app.tools.registry import ToolRegistry
 
@@ -25,20 +30,17 @@ def plan_question(
     return _payload(updates)
 
 
-def _payload(updates: dict[str, object]) -> dict[str, object]:
-    question = updates.get("clarification_question")
-    if isinstance(question, str) and question:
-        return {"status": "needs_clarification", "question": question}
-    plan = updates.get("plan")
-    if plan is not None and hasattr(plan, "model_dump"):
+def _payload(response: AgentResponse[PlannerUpdates]) -> dict[str, object]:
+    if response.status == "needs_clarification":
+        return {
+            "status": "needs_clarification",
+            "question": response.clarification_question,
+        }
+    plan = response.updates.plan
+    if response.status == "success" and plan is not None:
         return {"status": "success", "plan": plan.model_dump()}
-    return {"status": "error", "message": _error_message(updates)}
-
-
-def _error_message(updates: dict[str, object]) -> str:
-    errors = updates.get("errors")
-    if isinstance(errors, list) and errors:
-        message = getattr(errors[0], "message", None)
-        if isinstance(message, str) and message:
-            return message
-    return "The planner could not produce a plan"
+    message = response.error.message if response.error is not None else ""
+    return {
+        "status": "error",
+        "message": message or "The planner could not produce a plan",
+    }

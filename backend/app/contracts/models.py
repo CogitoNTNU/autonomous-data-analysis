@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 AgentName = Literal[
     "planner", "preprocessing", "analysis", "interpretation", "critic", "chat"
@@ -115,13 +115,30 @@ class Critique(ContractModel):
     required_changes: list[str] = Field(default_factory=list)
 
 
+class RevisionRecord(ContractModel):
+    """Feedback and evidence references retained when a revision starts."""
+
+    target_agent: Literal["planner", "preprocessing", "analysis", "interpretation"]
+    plan_id: str | None
+    dataset_version: NonEmptyString
+    result_ids: list[str] = Field(default_factory=list)
+    critique: Critique
+
+
 class RunControl(ContractModel):
     status: Literal[
-        "pending", "running", "needs_clarification", "completed", "error"
+        "pending",
+        "running",
+        "needs_clarification",
+        "completed",
+        "draft_completed",
+        "error",
     ] = "pending"
     current_agent: AgentName | None = None
     revision_count: int = Field(default=0, ge=0)
     max_revisions: int = Field(default=2, ge=0)
+    retry_count: int = Field(default=0, ge=0)
+    max_retries: int = Field(default=2, ge=0)
 
 
 class PlannerUpdates(ContractModel):
@@ -133,7 +150,36 @@ class PreprocessingUpdates(ContractModel):
     preprocessing_report: PreprocessingReport | None = None
 
 
+class AnalysisExecutionReport(ContractModel):
+    """Step execution outcome; complete does not imply Critic approval.
+
+    A failed report with no step outcomes represents rejection before execution.
+    """
+
+    outcome: Literal["complete", "partial", "failed"]
+    completed_step_ids: list[NonEmptyString] = Field(default_factory=list)
+    failed_step_ids: list[NonEmptyString] = Field(default_factory=list)
+    skipped_step_ids: list[NonEmptyString] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_outcome(self) -> "AnalysisExecutionReport":
+        ids = self.completed_step_ids + self.failed_step_ids + self.skipped_step_ids
+        if len(ids) != len(set(ids)):
+            raise ValueError("Step outcomes must be unique and disjoint")
+        expected = (
+            "failed"
+            if not self.completed_step_ids
+            else "partial"
+            if self.failed_step_ids or self.skipped_step_ids
+            else "complete"
+        )
+        if self.outcome != expected:
+            raise ValueError("Outcome does not match recorded steps")
+        return self
+
+
 class AnalysisUpdates(ContractModel):
+    execution_report: AnalysisExecutionReport | None = None
     analysis_results: list[AnalysisResult] = Field(default_factory=list)
     artifacts: list[Artifact] = Field(default_factory=list)
 

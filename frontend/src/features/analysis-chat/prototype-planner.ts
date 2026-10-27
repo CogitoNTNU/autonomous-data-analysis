@@ -1,4 +1,4 @@
-import type { PlannerClient } from "@/api/planner";
+import type { WorkflowClient, WorkflowSnapshot } from "@/api/workflows";
 import type {
   AnalysisReport,
   ChatAnswer,
@@ -11,41 +11,40 @@ import { getPrototypeClarification } from "@/features/analysis-chat/prototype-cl
 import { createPrototypeAnalysisPlan } from "@/features/analysis-chat/prototype-plan";
 
 const PREVIEW_DELAY_MS = 500;
-const CHAIN_DELAY_MS = 20;
-
-export const prototypePlanner: PlannerClient = {
-  async registerDataset() {
-    return { dataset_id: "preview" };
-  },
-  async ask({ question, columns }) {
+// Demo-only client. Production uses the persisted backend harness.
+const previews = new Map<string, WorkflowSnapshot>();
+export const prototypePlanner: WorkflowClient = {
+  async registerDataset() { return { dataset_id: "preview" }; },
+  async start({ question, columns }) {
     await wait(PREVIEW_DELAY_MS);
     const clarification = getPrototypeClarification(question, columns);
-    if (clarification) {
-      return { status: "clarification", clarification };
-    }
-    return { status: "plan", plan: createPrototypeAnalysisPlan(question) };
+    const result: WorkflowSnapshot = {
+      runId: crypto.randomUUID(), checkpointId: "preview", status: clarification ? "needs_clarification" : "running",
+      activeAgent: "planner", question: clarification?.question ?? null,
+      plan: clarification ? null : createPrototypeAnalysisPlan(question),
+      report: null, analysis: null, interpretation: null, critique: null, answer: null, error: null,
+    };
+    previews.set(result.runId, result);
+    return result;
   },
-  async preprocess() {
+  async resume({ runId, answer }) {
     await wait(PREVIEW_DELAY_MS);
-    return { status: "report", report: prototypeReport() };
+    const result = { ...preview(runId), status: "running" as const, question: null, plan: createPrototypeAnalysisPlan(answer) };
+    previews.set(runId, result);
+    return result;
   },
-  async analyze() {
-    await wait(CHAIN_DELAY_MS);
-    return { status: "analysis", analysis: prototypeAnalysis() };
-  },
-  async interpret() {
-    await wait(CHAIN_DELAY_MS);
-    return { status: "interpretation", interpretation: prototypeInterpretation() };
-  },
-  async critique() {
-    await wait(CHAIN_DELAY_MS);
-    return { status: "critique", critique: prototypeCritique() };
-  },
-  async present() {
-    await wait(CHAIN_DELAY_MS);
-    return { status: "answer", answer: prototypeAnswer() };
+  async status(runId) {
+    return { ...preview(runId), status: "completed", activeAgent: null,
+      report: prototypeReport(), analysis: prototypeAnalysis(), interpretation: prototypeInterpretation(),
+      critique: prototypeCritique(), answer: prototypeAnswer(),
+    };
   },
 };
+function preview(runId: string): WorkflowSnapshot {
+  const result = previews.get(runId);
+  if (!result) throw new Error("Unknown preview");
+  return result;
+}
 
 function prototypeReport(): PreprocessingReport {
   return {

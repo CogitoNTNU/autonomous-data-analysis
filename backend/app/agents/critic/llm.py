@@ -3,10 +3,17 @@
 import json
 import os
 
-from openai import OpenAI
+from openai import (
+    APIConnectionError,
+    APIResponseValidationError,
+    APITimeoutError,
+    OpenAI,
+)
 
 from backend.app.agents.critic.agent import CriticContext
 from backend.app.contracts.models import Critique
+
+from .context import serialize_context
 
 
 class CriticLLM:
@@ -16,6 +23,7 @@ class CriticLLM:
         self.client = OpenAI(
             base_url=os.environ["NTNU_LLM_BASE_URL"],
             api_key=os.environ["NTNU_LLM_API_KEY"],
+            max_retries=0,
         )
 
     def __call__(
@@ -23,36 +31,32 @@ class CriticLLM:
         prompt: str,
         context: CriticContext,
     ) -> Critique:
-        payload = {
-            "user_query": context.user_query,
-            "plan": (
-                context.plan.model_dump(mode="json")
-                if context.plan is not None
-                else None
-            ),
-            "analysis_results": [
-                result.model_dump(mode="json") for result in context.analysis_results
-            ],
-            "interpretation": context.interpretation.model_dump(mode="json"),
-        }
-
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        f"{prompt}\n\n"
-                        "Return JSON matching this schema:\n"
-                        f"{json.dumps(Critique.model_json_schema())}"
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(payload),
-                },
-            ],
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            f"{prompt}\n\n"
+                            "Return JSON matching this schema:\n"
+                            f"{json.dumps(Critique.model_json_schema())}"
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": serialize_context(context),
+                    },
+                ],
+            )
+        except APITimeoutError as error:
+            raise TimeoutError("The Critic model timed out.") from error
+        except APIConnectionError as error:
+            raise ConnectionError("The Critic provider is unreachable.") from error
+        except APIResponseValidationError as error:
+            raise ValueError(
+                "The Critic provider returned an invalid response."
+            ) from error
 
         content = response.choices[0].message.content
 

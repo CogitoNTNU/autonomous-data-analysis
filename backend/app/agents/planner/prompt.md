@@ -193,6 +193,7 @@ When CRITIQUE is provided:
 
 - identify the specific issue
 - revise only the parts of the plan that need revision
+- use `previous_plan` to identify the existing steps and return a complete revised plan
 - do not blindly repeat the previous plan
 - do not ignore critic errors
 - generate a new plan_id for a revised plan

@@ -30,20 +30,29 @@ def analyze_plan(
 ) -> dict[str, object]:
     plan = load_plan(plan_payload)
     processed, _report = prepare_dataset(dataset, plan)
+    if not plan.analysis_steps:
+        return {
+            "status": "success",
+            "results": [],
+            "artifacts": [],
+            "figures": [],
+            "warnings": [],
+        }
     state = create_initial_state(plan.objective, dataset)
     state["plan"] = plan
     state["processed_dataset"] = processed
-    updates = analysis_node(state)
-    results = updates.get("analysis_results")
-    if not isinstance(results, list):
-        raise ValueError(_failure(updates))
-    artifacts = _artifacts(updates.get("artifacts"))
+    response = analysis_node(state)
+    if response.status != "success":
+        message = response.error.message if response.error is not None else ""
+        raise ValueError(message or "Analysis could not run")
+    results = response.updates.analysis_results
+    artifacts = response.updates.artifacts
     return {
         "status": "success",
         "results": [public_result(result) for result in results],
         "artifacts": [public_artifact(artifact) for artifact in artifacts],
         "figures": figures_for(artifacts),
-        "warnings": _messages(updates.get("warnings")),
+        "warnings": _messages(response.warnings),
     }
 
 
@@ -70,12 +79,6 @@ def figures_for(artifacts: list[Artifact]) -> list[dict[str, str]]:
             continue
         figures.append({"artifact_id": artifact.artifact_id, "image": image})
     return figures
-
-
-def _artifacts(value: object) -> list[Artifact]:
-    if not isinstance(value, list):
-        return []
-    return [artifact for artifact in value if isinstance(artifact, Artifact)]
 
 
 def _figure_url(storage_ref: str) -> str | None:
@@ -109,10 +112,3 @@ def _messages(value: object) -> list[str]:
         if isinstance(warning, WarningEvent) and warning.message not in messages:
             messages.append(warning.message)
     return messages
-
-
-def _failure(updates: dict[str, object]) -> str:
-    messages = _messages(updates.get("warnings"))
-    if messages:
-        return messages[0]
-    return "Analysis could not run"

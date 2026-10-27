@@ -34,9 +34,9 @@ def test_critic_approves_interpretation():
             required_changes=[],
         )
 
-    updates = critic_node(state, fake_model)
+    response = critic_node(state, fake_model)
 
-    assert updates["critique"].decision == "approved"
+    assert response.updates.critique.decision == "approved"
 
 
 def test_critic_requires_interpretation():
@@ -55,9 +55,9 @@ def test_critic_requires_interpretation():
     def fake_model(prompt, context):
         raise AssertionError("Model should not be called")
 
-    updates = critic_node(state, fake_model)
+    response = critic_node(state, fake_model)
 
-    assert updates["errors"][0].code == "INVALID_DATA"
+    assert response.error.code == "INVALID_DATA"
 
 
 def test_critic_handles_invalid_model_output():
@@ -80,10 +80,10 @@ def test_critic_handles_invalid_model_output():
     def fake_model(prompt, context):
         raise ValueError("Invalid LLM response")
 
-    updates = critic_node(state, fake_model)
+    response = critic_node(state, fake_model)
 
-    assert updates["errors"][0].code == "INVALID_OUTPUT"
-    assert updates["errors"][0].source == "critic"
+    assert response.error.code == "INVALID_OUTPUT"
+    assert response.error.source == "critic"
 
 
 def test_critic_returns_revision_feedback():
@@ -120,6 +120,6 @@ def test_critic_returns_revision_feedback():
     def fake_model(prompt, context):
         return expected_critique
 
-    updates = critic_node(state, fake_model)
+    response = critic_node(state, fake_model)
 
-    assert updates["critique"] == expected_critique
+    assert response.updates.critique == expected_critique

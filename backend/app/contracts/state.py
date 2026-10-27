@@ -6,6 +6,7 @@ from uuid import uuid4
 from .errors import AgentError
 from .final_response import FinalResponse
 from .models import (
+    AnalysisExecutionReport,
     AnalysisResult,
     Artifact,
     ConversationMessage,
@@ -14,9 +15,11 @@ from .models import (
     Interpretation,
     Plan,
     PreprocessingReport,
+    RevisionRecord,
     RunControl,
     WarningEvent,
 )
+from .responses import ResponseStatus
 
 
 class AgentState(TypedDict):
@@ -27,6 +30,7 @@ class AgentState(TypedDict):
     plan: Plan | None
     processed_dataset: DatasetReference | None
     preprocessing_report: PreprocessingReport | None
+    analysis_execution_report: AnalysisExecutionReport | None
     analysis_results: list[AnalysisResult]
     artifacts: list[Artifact]
     interpretation: Interpretation | None
@@ -34,8 +38,12 @@ class AgentState(TypedDict):
     final_response: FinalResponse | None
     errors: list[AgentError]
     warnings: list[WarningEvent]
+    last_node_status: ResponseStatus | None
+    last_node_error: AgentError | None
+    revision_history: list[RevisionRecord]
     control: RunControl
     clarification_question: str | None
+    clarification_count: int
 
 
 def create_initial_state(
@@ -45,6 +53,7 @@ def create_initial_state(
     run_id: str | None = None,
     conversation_context: list[ConversationMessage] | None = None,
     max_revisions: int = 2,
+    max_retries: int = 2,
 ) -> AgentState:
     """Create isolated mutable values for each user run."""
     return AgentState(
@@ -57,6 +66,7 @@ def create_initial_state(
         plan=None,
         processed_dataset=None,
         preprocessing_report=None,
+        analysis_execution_report=None,
         analysis_results=[],
         artifacts=[],
         interpretation=None,
@@ -64,6 +74,10 @@ def create_initial_state(
         final_response=None,
         errors=[],
         warnings=[],
-        control=RunControl(max_revisions=max_revisions),
+        last_node_status=None,
+        last_node_error=None,
+        revision_history=[],
+        control=RunControl(max_revisions=max_revisions, max_retries=max_retries),
         clarification_question=None,
+        clarification_count=0,
     )

@@ -22,6 +22,9 @@ def context_message(context: PlannerContext, registry: ToolRegistry) -> str:
             context.critique.model_dump() if context.critique is not None else None
         ),
         "available_tools": context.available_tools,
+        "previous_plan": context.previous_plan.model_dump(mode="json")
+        if context.previous_plan
+        else None,
     }
     preview = _cleaning_preview(context, registry)
     if preview is not None:

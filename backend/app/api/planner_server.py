@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Callable
 
 from backend.app.agents.critic.agent import CriticModel
 from backend.app.agents.interpretation.schema import InterpretationModel
@@ -15,6 +15,7 @@ from backend.app.agents.planner.llm import PlannerLLM
 from backend.app.agents.preprocessing import register_preprocessing_tools
 from backend.app.api.origins import Headers, require_site_origin
 from backend.app.api.redact import redact
+from backend.app.api.workflows import ROUTES, dispatch_workflow
 from backend.app.contracts.models import ConversationMessage
 from backend.app.services.analysis_request import analyze_plan
 from backend.app.services.chat_request import present_answer
@@ -31,7 +32,9 @@ from backend.app.services.llm_env import ensure_llm_environment
 from backend.app.services.planner_request import plan_question
 from backend.app.services.preprocessing_request import preprocess_plan
 from backend.app.services.uploads import save_csv
+from backend.app.services.workflows import WorkflowService
 from backend.app.storage.datasets import HOSTED_UPLOADS, create_dataset_reference
+from backend.app.storage.workflow_checkpoints import WorkflowCheckpoints
 from backend.app.tools.analysis.descriptive import default_registry
 from backend.app.tools.dataset.inspection import inspection_registry
 from backend.app.tools.registry import ToolRegistry
@@ -62,12 +65,23 @@ class PlannerApp:
         )
         self.critic_factory = critic_factory or live_critic_model
         self.paths: dict[str, Path] = {}
+        self.workflows = WorkflowService(
+            WorkflowCheckpoints(directory / ".workflows"),
+            registry,
+            model_factory,
+            self.interpretation_factory,
+            self.critic_factory,
+        )
 
 
 class PlannerSite(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], app: PlannerApp) -> None:
         self.app = app
         super().__init__(address, PlannerHandler)
+
+    def server_close(self) -> None:
+        self.app.workflows.close()
+        super().server_close()
 
     @property
     def paths(self) -> dict[str, Path]:
@@ -77,7 +91,7 @@ class PlannerSite(ThreadingHTTPServer):
 class PlannerHandler(BaseHTTPRequestHandler):
     server: PlannerSite
 
-    def do_POST(self) -> None:  # noqa: N802 - stdlib handler name
+    def do_POST(self) -> None:
         try:
             body = _body(self)
         except ValueError as exc:
@@ -131,6 +145,8 @@ def dispatch(
         return 400, {"message": "The request is too large"}
     try:
         require_site_origin(headers)
+        if path.split("?", 1)[0] in ROUTES:
+            return dispatch_workflow(app, path.split("?", 1)[0], body)
         payload = _route(app, path.split("?", 1)[0], body)
     except (KeyError, UnicodeError, ValueError) as exc:
         return 400, {"message": redact(str(exc))}
@@ -272,7 +288,7 @@ def _captured(action: Callable[[], dict[str, object]]) -> dict[str, object]:
 def _object(body: bytes) -> dict[str, object]:
     request = json.loads(body.decode("utf-8"))
     if not isinstance(request, dict):
-        raise ValueError("Expected a JSON object")
+        raise ValueError("Expected a JSON object")  # noqa: TRY004 - HTTP validation errors use ValueError
     return request
 
 

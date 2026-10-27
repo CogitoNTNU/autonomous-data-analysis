@@ -9,6 +9,7 @@ from backend.app.agents.preprocessing import (
 )
 from backend.app.contracts.models import DatasetReference, Plan, PlanStep
 from backend.app.contracts.state import create_initial_state
+from backend.app.graph.responses import translate_agent_response
 from backend.app.storage.datasets import create_dataset_reference
 from backend.app.tools.analysis.descriptive import default_registry
 from backend.app.tools.preprocessing_tools import ChangeDatatypesArguments
@@ -61,9 +62,9 @@ def test_planner_preprocessing_analysis_share_workflow_contracts():
     state = create_initial_state("Summarize complete rows", dataset)
     state["plan"] = planner_response.updates.plan
 
-    updates = preprocessing_node(state)
-    processed_dataset = updates["processed_dataset"]
-    report = updates["preprocessing_report"]
+    response = preprocessing_node(state)
+    processed_dataset = response.updates.processed_dataset
+    report = response.updates.preprocessing_report
     output_path = Path(processed_dataset.storage_ref)
 
     try:
@@ -75,9 +76,9 @@ def test_planner_preprocessing_analysis_share_workflow_contracts():
         assert output_path.is_file()
         assert fixture.read_text(encoding="utf-8") == "age,score\n10,1.5\n,2.5\n30,\n"
 
-        state.update(updates)
+        state.update(translate_agent_response(state, response))
         analysis_updates = analysis_node(state, registry)
-        result = analysis_updates["analysis_results"][0]
+        result = analysis_updates.updates.analysis_results[0]
         assert result.dataset_version == processed_dataset.version
         assert result.sample_size == 1
         assert result.values["columns"]["score"]["mean"] == 1.5
@@ -94,18 +95,16 @@ def test_preprocessing_node_passes_through_dataset_when_plan_has_no_steps():
         analysis_steps=[],
     )
 
-    updates = preprocessing_node(state)
+    response = preprocessing_node(state)
 
-    assert updates["processed_dataset"].storage_ref == str(fixture)
-    assert updates["processed_dataset"].version == dataset.version
-    assert updates["preprocessing_report"].changes == []
-    assert updates["preprocessing_report"].rows_before == 3
-    assert updates["preprocessing_report"].rows_after == 3
+    assert response.updates.processed_dataset.storage_ref == str(fixture)
+    assert response.updates.processed_dataset.version == dataset.version
+    assert response.updates.preprocessing_report.changes == []
+    assert response.updates.preprocessing_report.rows_before == 3
+    assert response.updates.preprocessing_report.rows_after == 3
 
 
 def test_change_datatypes_normalizes_datetime_to_supported_date_type():
-    arguments = ChangeDatatypesArguments(
-        conversions={"signup date": "datetime"}
-    )
+    arguments = ChangeDatatypesArguments(conversions={"signup date": "datetime"})
 
     assert arguments.conversions == {"signup date": "date"}
