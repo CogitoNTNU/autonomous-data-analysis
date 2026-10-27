@@ -4,7 +4,13 @@ from pathlib import Path
 from unittest.mock import Mock
 
 from backend.app.agents.planner.schema import PlannerOutput
-from backend.app.contracts.models import Finding, Interpretation, Plan, PlanStep
+from backend.app.contracts.models import (
+    Critique,
+    Finding,
+    Interpretation,
+    Plan,
+    PlanStep,
+)
 from backend.scripts import run_workflow
 
 
@@ -37,18 +43,26 @@ def test_csv_runs_through_real_graph_with_fake_models(monkeypatch, capsys):
         )
 
     monkeypatch.setattr(run_workflow, "InterpretationLLM", Mock(return_value=interpret))
+    critic = Mock(return_value=Critique(decision="approved"))
+    critic.client = client
+    monkeypatch.setattr(run_workflow, "CriticLLM", Mock(return_value=critic))
     monkeypatch.setenv("NTNU_LLM_API_KEY", "test-only")
     assert run_workflow.main(["--dataset", str(path), "--prompt", "Describe age"]) == 0
     output = capsys.readouterr().out
-    assert "no Critic review" in output
-    assert [line for line in output.splitlines() if line.startswith("Completed node:")] == [
+    assert "approved by Critic" in output
+    assert [
+        line for line in output.splitlines() if line.startswith("Completed node:")
+    ] == [
+        "Completed node: start_run",
         "Completed node: planner",
         "Completed node: preprocessing",
         "Completed node: analysis",
         "Completed node: interpretation",
-        "Completed node: finish_draft",
+        "Completed node: critic",
+        "Completed node: finish_run",
     ]
-    client.__exit__.assert_called_once()
+    assert client.__exit__.call_count == 2
+    critic.assert_called_once()
 
 
 def test_missing_csv_does_not_create_provider(monkeypatch, capsys):

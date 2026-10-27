@@ -32,19 +32,16 @@ def state():
     state["plan"] = Plan(plan_id="old", objective="old")
     state["processed_dataset"] = dataset
     state["interpretation"] = Interpretation(summary="Old draft")
-    state["errors"] = [
-        AgentError(code="TIMEOUT", message="Old timeout", source="planner")
-    ]
     return state
 
 
-def test_planner_replaces_plan_despite_historical_error(state, monkeypatch):
+def test_planner_replaces_plan_and_clears_downstream(state, monkeypatch):
     plan = Plan(plan_id="new", objective="new")
     response = AgentResponse[PlannerUpdates](
         status="success", updates=PlannerUpdates(plan=plan)
     )
     monkeypatch.setattr(nodes, "planner_node", Mock(return_value=response))
-    patch = nodes.planner_step(state, ToolRegistry(), Mock())
+    patch = nodes.planner_graph_node(state, ToolRegistry(), Mock())
     assert patch["plan"] == plan
     assert patch["processed_dataset"] is None
     assert patch["interpretation"] is None
@@ -62,7 +59,7 @@ def test_planner_clarification_clears_old_plan(state, monkeypatch):
         clarification_question="Which column?",
     )
     monkeypatch.setattr(nodes, "planner_node", Mock(return_value=response))
-    patch = nodes.planner_step(state, ToolRegistry(), Mock())
+    patch = nodes.planner_graph_node(state, ToolRegistry(), Mock())
     assert patch["plan"] is None
     assert patch["clarification_question"] == "Which column?"
     assert route_after_planner({**state, **patch}) == "end"
@@ -77,7 +74,7 @@ def test_preprocessing_maps_payload_and_clears_downstream(state, monkeypatch):
         ),
     )
     monkeypatch.setattr(nodes, "preprocessing_node", Mock(return_value=response))
-    patch = nodes.preprocessing_step(state)
+    patch = nodes.preprocessing_graph_node(state)
     assert patch["processed_dataset"] == state["dataset"]
     assert patch["preprocessing_report"] == report
     assert patch["analysis_results"] == []
@@ -101,7 +98,7 @@ def test_analysis_preserves_report_for_partial_and_failed_execution(
         else None,
     )
     monkeypatch.setattr(nodes, "analysis_node", Mock(return_value=response))
-    patch = nodes.analysis_step(state, ToolRegistry())
+    patch = nodes.analysis_graph_node(state, ToolRegistry())
     assert patch["analysis_execution_report"] == report
     assert patch["last_node_status"] == response.status
     assert patch["interpretation"] is None
@@ -117,7 +114,7 @@ def test_interpretation_failure_clears_old_draft(state, monkeypatch):
     )
     runner = Mock(return_value=response)
     monkeypatch.setattr(nodes, "interpretation_node", runner)
-    patch = nodes.interpretation_step(state, Mock())
+    patch = nodes.interpretation_graph_node(state, Mock())
     assert runner.call_args.args[0]["interpretation"].summary == "Old draft"
     assert patch["interpretation"] is None
     assert patch["last_node_status"] == "error"

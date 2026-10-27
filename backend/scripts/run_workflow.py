@@ -1,11 +1,13 @@
-"""Run a registered CSV through the graph and print an unreviewed draft."""
+"""Run a registered CSV through the graph and print a Critic-approved interpretation."""
 
 import argparse
 import os
 import sys
+from contextlib import ExitStack
 
 from openai import OpenAIError
 
+from backend.app.agents.critic.llm import CriticLLM
 from backend.app.agents.interpretation.llm import InterpretationLLM
 from backend.app.agents.planner.llm import PlannerLLM
 from backend.app.agents.preprocessing import register_preprocessing_tools
@@ -25,8 +27,13 @@ def print_outcome(state: AgentState) -> int:
         print("Run again with a more specific --prompt; resume is not implemented yet.")
         return 2
     draft = state["interpretation"]
-    if state["control"].status == "draft_completed" and draft is not None:
-        print("INTERPRETATION DRAFT — no Critic review performed")
+    if (
+        state["control"].status == "completed"
+        and draft is not None
+        and state["critique"] is not None
+        and state["critique"].decision == "approved"
+    ):
+        print("INTERPRETATION — approved by Critic")
         print(draft.model_dump_json(indent=2))
         return 0
     code = state["errors"][-1].code if state["errors"] else "INCOMPLETE"
@@ -66,17 +73,27 @@ def main(argv: list[str] | None = None) -> int:
     register_preprocessing_tools(registry)
     try:
         planner = PlannerLLM(inspection_registry=inspection_registry())
-        with planner.client as client:
+        with ExitStack() as stack:
+            client = stack.enter_context(planner.client)
+            critic = CriticLLM()
+            critic_client = stack.enter_context(critic.client)
+            critic_client.max_retries = 0
+            critic_client.timeout = settings.timeout_seconds
             client.max_retries = 0
             client.timeout = settings.timeout_seconds
             interpretation = InterpretationLLM(
                 client, settings.model_name, timeout_seconds=settings.timeout_seconds
             )
-            graph = build_graph(registry, planner, interpretation)
+            graph = build_graph(
+                registry,
+                planner,
+                interpretation_model=interpretation,
+                critic_model=critic,
+            )
             state = create_initial_state(args.prompt, dataset)
             for event in graph.stream(
                 state,
-                config={"recursion_limit": 10},
+                config={"recursion_limit": 20},
                 stream_mode="updates",
             ):
                 for node_name, updates in event.items():
