@@ -5,6 +5,18 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkspaceHeader } from "@/features/workspace/WorkspaceHeader";
 
 describe("WorkspaceHeader", () => {
+  it("shows New chat as the title", () => {
+    render(
+      <WorkspaceHeader
+        hasDataset={false}
+        onNewAnalysis={vi.fn()}
+        onToggleTheme={vi.fn()}
+        theme="light"
+      />,
+    );
+    expect(screen.getByRole("heading", { level: 1, name: "New chat" })).toBeVisible();
+  });
+
   it("requests dark mode from the light theme", async () => {
     const onToggleTheme = vi.fn();
     const user = userEvent.setup();

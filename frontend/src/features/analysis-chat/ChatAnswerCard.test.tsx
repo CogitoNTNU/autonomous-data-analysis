@@ -18,11 +18,13 @@ const answer: ChatAnswer = {
 };
 
 describe("ChatAnswerCard", () => {
-  it("opens with the findings and chart, then collapses from the keyboard", async () => {
+  it("shows the findings and chart after opening, then collapses from the keyboard", async () => {
     const user = userEvent.setup();
     render(<ChatAnswerCard answer={answer} figures={figures} />);
 
     const toggle = screen.getByRole("button", { name: "Prepared an answer" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Older penguins weigh more.")).toBeVisible();
     expect(screen.getByText("Mass rises with age.")).toBeVisible();

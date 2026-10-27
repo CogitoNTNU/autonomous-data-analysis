@@ -9,10 +9,8 @@ describe("ThinkingIndicator", () => {
 
     const status = screen.getByRole("status");
     expect(screen.getByText("Planner")).toBeVisible();
-    expect(status).toHaveTextContent("Thinking");
-    expect(status).toHaveTextContent("Reviewing the dataset structure");
-    expect(status).toHaveTextContent(
-      "Checking whether clarification is needed",
-    );
+    expect(status).toHaveAccessibleName("Thinking");
+    expect(screen.queryByText("Thinking")).toBeNull();
+    expect(status.querySelectorAll(".thinking-dot")).toHaveLength(3);
   });
 });

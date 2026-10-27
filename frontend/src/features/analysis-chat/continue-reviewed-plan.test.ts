@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { PlannerClient } from "@/api/planner";
+import type { InterpretationAsk, PlannerClient } from "@/api/planner";
 import { continueReviewedPlan } from "@/features/analysis-chat/continue-reviewed-plan";
-import type { StoredPlan } from "@/types/planner";
+import { prototypePlanner } from "@/features/analysis-chat/prototype-planner";
+import type { CritiqueView, InterpretationView, StoredPlan } from "@/types/planner";
 
 const findings = [{ claim: "Mass rises with age.", resultIds: ["r1"] }];
 const artifacts = [
@@ -18,8 +19,50 @@ const plan: StoredPlan = {
   expected_outputs: [],
   assumptions: [],
 };
+const interpretation: InterpretationView = {
+  summary: "Older penguins weigh more.",
+  findings,
+  limitations: [],
+  unanswered: [],
+  source: { summary: "Older penguins weigh more." },
+};
+const critique: CritiqueView = {
+  decision: "approved",
+  issues: [],
+  requiredChanges: [],
+  source: { decision: "approved" },
+};
 
-describe("continueReviewedPlan", () => {
+const input: InterpretationAsk = {
+  datasetId: "dataset-1",
+  csv: "city,amount\nOslo,1",
+  plan: { plan_id: "plan-1", objective: "Compare amounts", required_columns: [], preprocessing_steps: [], analysis_steps: [], expected_outputs: [], assumptions: [] },
+  question: "Compare amounts",
+  results: [],
+  artifacts: [],
+};
+
+describe("manual agent transitions", () => {
+  it("stops at a failed stage without starting a downstream agent", async () => {
+    const analyze = vi.fn();
+    const publish = vi.fn();
+    await continueReviewedPlan({
+      ...prototypePlanner,
+      preprocess: async () => ({ status: "error", message: "Invalid plan" }),
+      analyze,
+    }, input, publish);
+    expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ phase: "error", message: "Invalid plan" }));
+    expect(analyze).not.toHaveBeenCalled();
+  });
+
+  it("rejects a review without an interpretation", async () => {
+    const critiqueClient = vi.fn();
+    const publish = vi.fn();
+    await continueReviewedPlan({ ...prototypePlanner, critique: critiqueClient }, input, publish, "critic");
+    expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ phase: "error", message: "Interpretation is required before review" }));
+    expect(critiqueClient).not.toHaveBeenCalled();
+  });
+
   it("passes analysis artifacts and findings to present without chart bytes", async () => {
     const present = vi.fn().mockResolvedValue({
       status: "answer",
@@ -32,7 +75,14 @@ describe("continueReviewedPlan", () => {
       },
     });
 
-    await continueReviewedPlan(client(present), ask(), () => undefined);
+    await continueReviewedPlan(
+      client(present),
+      { ...ask(), artifacts },
+      () => undefined,
+      "chat",
+      interpretation,
+      critique,
+    );
 
     expect(present).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -59,45 +109,10 @@ function client(present: PlannerClient["present"]): PlannerClient {
   return {
     registerDataset: vi.fn(),
     ask: vi.fn(),
-    preprocess: vi.fn().mockResolvedValue({
-      status: "report",
-      report: {
-        changes: [],
-        affectedColumns: [],
-        rowsBefore: 1,
-        rowsAfter: 1,
-        warnings: [],
-      },
-    }),
-    analyze: vi.fn().mockResolvedValue({
-      status: "analysis",
-      analysis: {
-        steps: [],
-        figures: [{ id: "heatmap-1", image: "data:image/png;base64,abc" }],
-        warnings: [],
-        results: [{ step_id: "r1" }],
-        artifacts,
-      },
-    }),
-    interpret: vi.fn().mockResolvedValue({
-      status: "interpretation",
-      interpretation: {
-        summary: "Older penguins weigh more.",
-        findings,
-        limitations: [],
-        unanswered: [],
-        source: { summary: "Older penguins weigh more." },
-      },
-    }),
-    critique: vi.fn().mockResolvedValue({
-      status: "critique",
-      critique: {
-        decision: "approved",
-        issues: [],
-        requiredChanges: [],
-        source: { decision: "approved" },
-      },
-    }),
+    preprocess: vi.fn(),
+    analyze: vi.fn(),
+    interpret: vi.fn(),
+    critique: vi.fn(),
     present,
   };
 }

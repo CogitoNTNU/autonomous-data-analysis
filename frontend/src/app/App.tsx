@@ -1,3 +1,5 @@
+import { ChatScrollArea } from "@/features/analysis-chat/ChatScrollArea";
+import { useState } from "react";
 import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
 import { agents } from "@/features/analysis-chat/agents";
 import { AnalysisQuestionComposer } from "@/features/analysis-chat/AnalysisQuestionComposer";
@@ -19,10 +21,12 @@ type AppProps = {
 };
 
 export function App({ planner }: AppProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const { theme, toggleTheme } = useTheme();
   const session = usePlannerSession(planner);
   const waiting =
     session.phase === "thinking" ||
+    session.phase.endsWith("_ready") ||
     session.phase === "plan" ||
     session.phase === "preprocessing" ||
     session.phase === "analysis" ||
@@ -34,21 +38,30 @@ export function App({ planner }: AppProps) {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
+      <div
+        className={`hidden shrink-0 overflow-hidden transition-[width,opacity] duration-300 ease-in-out lg:flex ${sidebarOpen ? "w-[260px] opacity-100" : "w-0 opacity-0"}`}
+        id="workspace-sidebar"
+        inert={!sidebarOpen}
+        aria-hidden={!sidebarOpen}
+      >
       <AppSidebar
         dataset={session.dataset}
         onNewAnalysis={session.resetQuestion}
         onReplaceDataset={session.replaceDataset}
+        onClose={() => setSidebarOpen(false)}
       />
+      </div>
       <main className="relative flex min-w-0 flex-1 flex-col">
         <WorkspaceHeader
-          datasetName={session.dataset?.fileName}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
           hasDataset={session.dataset !== null}
           onNewAnalysis={session.resetQuestion}
           onToggleTheme={toggleTheme}
           theme={theme}
         />
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[760px] px-5 pb-44 sm:px-6">
+        <ChatScrollArea>
+          <div className="mx-auto w-full max-w-[800px] pb-10">
             {session.dataset ? (
               <DatasetConversation dataset={session.dataset} session={session} />
             ) : (
@@ -64,15 +77,22 @@ export function App({ planner }: AppProps) {
               </>
             )}
           </div>
-        </div>
+        </ChatScrollArea>
         <AnalysisQuestionComposer
           disabled={waiting || session.dataset === null}
           finished={session.phase === "complete"}
           hasDataset={session.dataset !== null}
           onChange={session.setQuestion}
-          onReplaceDataset={session.replaceDataset}
           onSubmit={session.submitQuestion}
           question={session.question}
+          suggestions={
+            session.dataset && !session.submittedQuestion ? (
+              <QuestionSuggestions
+                dataset={session.dataset}
+                onSelect={session.submitQuestion}
+              />
+            ) : null
+          }
         />
       </main>
     </div>
@@ -86,17 +106,21 @@ function DatasetConversation({
   dataset: NonNullable<ReturnType<typeof usePlannerSession>["dataset"]>;
   session: ReturnType<typeof usePlannerSession>;
 }) {
+  const editingDisabled = ["thinking", "preprocessing", "analysis", "interpretation", "critic", "chat"].includes(session.phase);
+  function editQuestion(question: string) {
+    session.editQuestion(question);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Analysis question"]')?.focus();
+    });
+  }
   return (
     <>
-      <DatasetPreviewPanel
-        dataset={dataset}
-        onReplaceDataset={session.replaceDataset}
-      />
+      <DatasetPreviewPanel dataset={dataset} onReplaceDataset={session.acceptDataset} />
       {session.submittedQuestion ? (
         <>
-          <SubmittedQuestion question={session.submittedQuestion} />
+          <SubmittedQuestion question={session.submittedQuestion} onEdit={editQuestion} editDisabled={editingDisabled} />
           {session.clarificationAnswer && (
-            <SubmittedQuestion question={session.clarificationAnswer} />
+            <SubmittedQuestion question={session.clarificationAnswer} onEdit={editQuestion} editDisabled={editingDisabled} />
           )}
           {session.phase === "thinking" && <ThinkingIndicator />}
           {session.plan && <WorkflowTurns session={session} />}
@@ -113,12 +137,7 @@ function DatasetConversation({
             <PlannerError agent={agents.planner} message={session.error} />
           )}
         </>
-      ) : (
-        <QuestionSuggestions
-          dataset={dataset}
-          onSelect={session.submitQuestion}
-        />
-      )}
+      ) : null}
     </>
   );
 }
@@ -132,7 +151,7 @@ function PlannerError({
 }) {
   return (
     <AgentTurn agent={agent}>
-      <p className="text-xs text-destructive" role="alert">
+      <p className="text-base leading-7 text-destructive" role="alert">
         {message}
       </p>
     </AgentTurn>

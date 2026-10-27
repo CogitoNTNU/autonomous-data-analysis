@@ -3,7 +3,7 @@ export function WarningList({ warnings }: { warnings: string[] }) {
     return null;
   }
   return (
-    <ul className="mt-3 space-y-1 text-[11px] leading-4">
+    <ul className="mt-3 space-y-1 text-base leading-7">
       {warnings.map((warning) => (
         <li key={warning}>{warning}</li>
       ))}
