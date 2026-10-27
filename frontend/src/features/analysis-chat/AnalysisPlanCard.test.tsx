@@ -80,7 +80,7 @@ describe("AnalysisPlanCard", () => {
     render(<AnalysisPlanCard onRun={onRun} plan={plan} />);
 
     expect(screen.queryByText("Compare sales by city")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Prepare dataset" }));
 
     expect(onRun).toHaveBeenCalledOnce();
     expect(screen.queryByText("Compare sales by city")).toBeNull();

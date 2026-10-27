@@ -23,6 +23,7 @@ export function App({ planner }: AppProps) {
   const session = usePlannerSession(planner);
   const waiting =
     session.phase === "thinking" ||
+    session.phase.endsWith("_ready") ||
     session.phase === "plan" ||
     session.phase === "preprocessing" ||
     session.phase === "analysis" ||

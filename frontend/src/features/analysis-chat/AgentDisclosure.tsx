@@ -39,12 +39,12 @@ export function AgentDisclosure({
             )}
           />
         </button>
-        {actions}
         {open && (
           <div className="mt-3" id={detailsId}>
             {children}
           </div>
         )}
+        {actions}
       </AgentTurn>
     </section>
   );

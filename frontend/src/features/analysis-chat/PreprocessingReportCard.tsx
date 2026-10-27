@@ -1,14 +1,16 @@
+import type { ReactNode } from "react";
 import { AgentDisclosure } from "@/features/analysis-chat/AgentDisclosure";
 import { agents } from "@/features/analysis-chat/agents";
 import type { PreprocessingReport } from "@/types/planner";
 
 type PreprocessingReportCardProps = {
   report: PreprocessingReport;
+  actions?: ReactNode;
 };
 
-export function PreprocessingReportCard({ report }: PreprocessingReportCardProps) {
+export function PreprocessingReportCard({ report, actions }: PreprocessingReportCardProps) {
   return (
-    <AgentDisclosure agent={agents.preprocessing} summary={summary(report)}>
+    <AgentDisclosure actions={actions} agent={agents.preprocessing} summary={summary(report)}>
       <p className="text-xs leading-5">
         {report.rowsBefore} rows in, {report.rowsAfter} rows out.
       </p>

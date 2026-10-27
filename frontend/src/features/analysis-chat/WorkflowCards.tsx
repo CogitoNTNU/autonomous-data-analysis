@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AgentDisclosure } from "@/features/analysis-chat/AgentDisclosure";
 import { agents } from "@/features/analysis-chat/agents";
 import type {
@@ -7,11 +8,12 @@ import type {
   InterpretationView,
 } from "@/types/planner";
 
-export function AnalysisReportCard({ analysis }: { analysis: AnalysisReport }) {
+export function AnalysisReportCard({ analysis, actions }: { analysis: AnalysisReport; actions?: ReactNode }) {
   const count = analysis.steps.length;
   const label = count === 1 ? "result" : "results";
   return (
     <AgentDisclosure
+      actions={actions}
       agent={agents.analysis}
       summary={`Analysis finished, ${count} ${label}`}
     >
@@ -46,11 +48,13 @@ export function AnalysisReportCard({ analysis }: { analysis: AnalysisReport }) {
 
 export function InterpretationCard({
   interpretation,
+  actions,
 }: {
   interpretation: InterpretationView;
+  actions?: ReactNode;
 }) {
   return (
-    <AgentDisclosure agent={agents.interpretation} summary="Interpretation finished">
+    <AgentDisclosure actions={actions} agent={agents.interpretation} summary="Interpretation finished">
       <p className="text-xs leading-5">{interpretation.summary}</p>
       <TextList items={interpretation.findings} title="Findings" />
       <TextList items={interpretation.limitations} title="Limitations" />
@@ -58,9 +62,9 @@ export function InterpretationCard({
   );
 }
 
-export function CriticCard({ critique }: { critique: CritiqueView }) {
+export function CriticCard({ critique, actions }: { critique: CritiqueView; actions?: ReactNode }) {
   return (
-    <AgentDisclosure agent={agents.critic} summary={criticSummary(critique.decision)}>
+    <AgentDisclosure actions={actions} agent={agents.critic} summary={criticSummary(critique.decision)}>
       {critique.issues.length > 0 ? (
         <ul className="space-y-1.5 text-[11px] leading-4 text-muted-foreground">
           {critique.issues.map((issue) => (

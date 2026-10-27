@@ -165,8 +165,21 @@ describe("usePlannerSession", () => {
       expect(result.current.phase).toBe("plan");
     });
     await act(async () => {
-      await result.current.runPreprocessing();
+      await result.current.runNextAgent();
     });
+
+    expect(result.current.phase).toBe("analysis_ready");
+    expect(analyze).not.toHaveBeenCalled();
+    await act(async () => { await result.current.runNextAgent(); });
+    expect(result.current.phase).toBe("interpretation_ready");
+    expect(client.interpret).not.toHaveBeenCalled();
+    await act(async () => { await result.current.runNextAgent(); });
+    expect(result.current.phase).toBe("critic_ready");
+    expect(client.critique).not.toHaveBeenCalled();
+    await act(async () => { await result.current.runNextAgent(); });
+    expect(result.current.phase).toBe("chat_ready");
+    expect(client.present).not.toHaveBeenCalled();
+    await act(async () => { await result.current.runNextAgent(); });
 
     expect(analyze).toHaveBeenCalledWith(
       expect.objectContaining({

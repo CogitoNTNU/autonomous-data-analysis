@@ -21,6 +21,10 @@ import type {
 } from "@/types/planner";
 
 export type PlannerPhase =
+  | "analysis_ready"
+  | "interpretation_ready"
+  | "critic_ready"
+  | "chat_ready"
   | "idle"
   | "thinking"
   | "clarification"
@@ -176,12 +180,22 @@ export function usePlannerSession(client: PlannerClient = browserPlanner) {
     setPhase(hasChoices(result.clarification) ? "clarification" : "clarification_input");
   }
 
-  async function runPreprocessing() {
+  async function runNextAgent() {
     const current = source.current;
     if (!current || !plan) {
       return;
     }
+    const nextStage = {
+      plan: "preprocessing",
+      analysis_ready: "analysis",
+      interpretation_ready: "interpretation",
+      critic_ready: "critic",
+      chat_ready: "chat",
+    } as const;
+    const stage = nextStage[phase as keyof typeof nextStage];
+    if (!stage) return;
     const id = ++run.current;
+    setPhase(stage);
     setError(null);
     const question = clarificationAnswer ?? submittedQuestion ?? plan.objective;
     try {
@@ -192,21 +206,24 @@ export function usePlannerSession(client: PlannerClient = browserPlanner) {
           csv: await readCsvText(current.file),
           plan: plan.source,
           question,
-          results: [],
-          artifacts: [],
+          results: analysis?.results ?? [],
+          artifacts: analysis?.artifacts ?? [],
         },
         (update) => {
           if (run.current === id) {
             applyContinue(update);
           }
         },
+        stage,
+        interpretation,
+        critique,
       );
     } catch (reason: unknown) {
       if (run.current !== id) {
         return;
       }
       setError(messageFrom(reason));
-      setErrorAgent(agents.preprocessing);
+      setErrorAgent(agents[stage]);
       setPhase("error");
     }
   }
@@ -218,16 +235,16 @@ export function usePlannerSession(client: PlannerClient = browserPlanner) {
       setPhase("error");
       return;
     }
-    if (update.phase === "analysis") {
+    if (update.phase === "analysis_ready") {
       setReport(update.report);
     }
-    if (update.phase === "interpretation") {
+    if (update.phase === "interpretation_ready") {
       setAnalysis(update.analysis);
     }
-    if (update.phase === "critic") {
+    if (update.phase === "critic_ready") {
       setInterpretation(update.interpretation);
     }
-    if (update.phase === "chat") {
+    if (update.phase === "chat_ready") {
       setCritique(update.critique);
     }
     if (update.phase === "complete") {
@@ -255,7 +272,7 @@ export function usePlannerSession(client: PlannerClient = browserPlanner) {
     acceptDataset,
     submitQuestion,
     answerClarification,
-    runPreprocessing,
+    runNextAgent,
     resetQuestion,
     replaceDataset,
     editQuestion,

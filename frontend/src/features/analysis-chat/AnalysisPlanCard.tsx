@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,9 +28,10 @@ export function AnalysisPlanCard({ plan, onRun, running = false }: AnalysisPlanC
     <AgentDisclosure
       actions={
         onRun && (
-          <div className="mt-3 scroll-mb-48" ref={action}>
-            <Button disabled={running} onClick={onRun} type="button">
-              Continue
+          <div className="mt-3 flex justify-end border-t border-border/50 pt-2 scroll-mb-48" ref={action}>
+            <Button variant="ghost" size="sm" className="gap-2 text-xs text-muted-foreground hover:text-foreground" disabled={running} onClick={onRun} type="button">
+              Prepare dataset
+              <ArrowRight aria-hidden="true" className="size-3.5" />
             </Button>
           </div>
         )

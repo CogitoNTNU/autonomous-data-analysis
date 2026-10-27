@@ -183,7 +183,13 @@ describe("App dataset preview flow", () => {
       await screen.findByRole("button", { name: "Prepared an analysis plan, 3 steps" }),
     ).toBeVisible();
     expect(screen.queryByText(/The uploaded CSV is the dataset/)).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Prepare dataset" }));
+
+    for (const label of ["Run analysis", "Interpret results", "Review findings", "Show final answer"]) {
+      expect(screen.queryByRole("button", { name: "Prepared an answer" })).toBeNull();
+      await user.click(await screen.findByRole("button", { name: label }));
+    }
+
 
 
     expect(
