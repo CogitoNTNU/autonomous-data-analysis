@@ -1,4 +1,4 @@
-import { Moon, Plus, Sun } from "lucide-react";
+import { Moon, PanelLeftOpen, Plus, Sun } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import type { Theme } from "@/features/workspace/use-theme";
 type WorkspaceHeaderProps = {
   datasetName?: string;
   hasDataset: boolean;
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
   onNewAnalysis: () => void;
   onToggleTheme: () => void;
   theme: Theme;
@@ -16,6 +18,8 @@ type WorkspaceHeaderProps = {
 export function WorkspaceHeader({
   datasetName,
   hasDataset,
+  sidebarOpen = true,
+  onToggleSidebar,
   onNewAnalysis,
   onToggleTheme,
   theme,
@@ -24,6 +28,11 @@ export function WorkspaceHeader({
 
   return (
     <header className="flex h-14 shrink-0 items-center border-b border-border bg-background/95 px-4 backdrop-blur sm:px-5">
+      {!sidebarOpen && onToggleSidebar && (
+        <Button className="mr-2 hidden lg:inline-flex" aria-label="Open sidebar" title="Open sidebar" variant="ghost" size="icon" onClick={onToggleSidebar} aria-controls="workspace-sidebar" aria-expanded={false}>
+          <PanelLeftOpen className="size-4" />
+        </Button>
+      )}
       <AgentMark className="mr-2 lg:hidden" compact />
       <div className="px-2 text-sm font-medium">
         Planner <span className="font-normal text-muted-foreground">v1</span>

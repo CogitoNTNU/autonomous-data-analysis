@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
 import { agents } from "@/features/analysis-chat/agents";
 import { AnalysisQuestionComposer } from "@/features/analysis-chat/AnalysisQuestionComposer";
@@ -19,6 +20,7 @@ type AppProps = {
 };
 
 export function App({ planner }: AppProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const { theme, toggleTheme } = useTheme();
   const session = usePlannerSession(planner);
   const waiting =
@@ -35,13 +37,23 @@ export function App({ planner }: AppProps) {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
+      <div
+        className={`hidden shrink-0 overflow-hidden transition-[width,opacity] duration-300 ease-in-out lg:flex ${sidebarOpen ? "w-[260px] opacity-100" : "w-0 opacity-0"}`}
+        id="workspace-sidebar"
+        inert={!sidebarOpen}
+        aria-hidden={!sidebarOpen}
+      >
       <AppSidebar
         dataset={session.dataset}
         onNewAnalysis={session.resetQuestion}
         onReplaceDataset={session.replaceDataset}
+        onClose={() => setSidebarOpen(false)}
       />
+      </div>
       <main className="relative flex min-w-0 flex-1 flex-col">
         <WorkspaceHeader
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
           datasetName={session.dataset?.fileName}
           hasDataset={session.dataset !== null}
           onNewAnalysis={session.resetQuestion}

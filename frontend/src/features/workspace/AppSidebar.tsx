@@ -1,5 +1,6 @@
 import {
   ChevronRight,
+  PanelLeftClose,
   FileSpreadsheet,
   Plus,
 } from "lucide-react";
@@ -13,22 +14,29 @@ import type { DatasetPreview } from "@/types/dataset";
 
 type AppSidebarProps = {
   dataset: DatasetPreview | null;
+  onClose?: () => void;
   onNewAnalysis: () => void;
   onReplaceDataset: () => void;
 };
 
 export function AppSidebar({
   dataset,
+  onClose,
   onNewAnalysis,
   onReplaceDataset,
 }: AppSidebarProps) {
   const [isDatasetOpen, setIsDatasetOpen] = useState(true);
 
   return (
-    <aside className="hidden w-[260px] shrink-0 flex-col bg-sidebar p-3 lg:flex">
+    <aside className="hidden w-[260px] shrink-0 flex-col border-r border-border/40 bg-sidebar p-3 lg:flex">
       <div className="flex h-11 items-center gap-2.5 px-2">
         <AgentMark compact />
-        <span className="text-[13px] font-semibold">Data Analysis Planner</span>
+        <span className="min-w-0 flex-1 text-[13px] font-semibold">Data Analysis Planner</span>
+        {onClose && (
+          <Button aria-label="Close sidebar" title="Close sidebar" variant="ghost" size="icon" onClick={onClose} aria-controls="workspace-sidebar" aria-expanded={true}>
+            <PanelLeftClose className="size-4" />
+          </Button>
+        )}
       </div>
 
       <Button

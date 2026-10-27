@@ -6,6 +6,17 @@ import { App } from "@/app/App";
 import { prototypePlanner } from "@/features/analysis-chat/prototype-planner";
 
 describe("App dataset preview flow", () => {
+  it("closes and reopens the sidebar", async () => {
+    const user = userEvent.setup();
+    render(<App planner={prototypePlanner} />);
+    await user.click(screen.getByRole("button", { name: "Close sidebar" }));
+    expect(document.getElementById("workspace-sidebar")).toHaveClass("w-0", "opacity-0");
+    expect(document.getElementById("workspace-sidebar")).toHaveAttribute("inert");
+    await user.click(screen.getByRole("button", { name: "Open sidebar" }));
+    expect(document.getElementById("workspace-sidebar")).toHaveClass("w-[260px]", "opacity-100");
+    expect(document.getElementById("workspace-sidebar")).not.toHaveAttribute("inert");
+  });
+
   it("switches between light and dark mode", async () => {
     const user = userEvent.setup();
     render(<App planner={prototypePlanner} />);
