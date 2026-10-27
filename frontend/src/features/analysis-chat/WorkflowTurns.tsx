@@ -1,14 +1,12 @@
 import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
 import { agents } from "@/features/analysis-chat/agents";
 import { AnalysisPlanCard } from "@/features/analysis-chat/AnalysisPlanCard";
+import { AnalysisReportCard } from "@/features/analysis-chat/AnalysisReportCard";
+import { ChatAnswerCard } from "@/features/analysis-chat/ChatAnswerCard";
+import { CriticCard } from "@/features/analysis-chat/CriticCard";
+import { InterpretationCard } from "@/features/analysis-chat/InterpretationCard";
 import { PreprocessingReportCard } from "@/features/analysis-chat/PreprocessingReportCard";
 import { ThinkingIndicator } from "@/features/analysis-chat/ThinkingIndicator";
-import {
-  AnalysisReportCard,
-  ChatAnswerCard,
-  CriticCard,
-  InterpretationCard,
-} from "@/features/analysis-chat/WorkflowCards";
 import type { usePlannerSession } from "@/features/analysis-chat/usePlannerSession";
 
 const running = {
