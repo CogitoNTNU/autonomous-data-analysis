@@ -67,11 +67,12 @@ export function AppSidebar({
           <Card className="mt-2 shadow-none">
             <button
               aria-expanded={isDatasetOpen}
-              className="flex w-full items-center gap-2.5 p-3 text-left"
+              aria-current="true"
+              className="flex w-full items-center gap-2.5 rounded-t-xl p-3 text-left transition-colors hover:bg-muted/50"
               onClick={() => setIsDatasetOpen((open) => !open)}
               type="button"
             >
-              <span className="grid size-8 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
+              <span className="grid size-8 place-items-center rounded-lg bg-emerald-600/10 text-emerald-700 dark:text-emerald-400">
                 <FileSpreadsheet className="size-4" />
               </span>
               <span className="min-w-0 flex-1">
@@ -108,7 +109,7 @@ export function AppSidebar({
                   </p>
                 )}
                 <Button
-                  className="mt-2 h-auto p-0 text-sm text-emerald-700 hover:bg-transparent hover:underline"
+                  className="mt-3 h-auto p-0 text-sm text-muted-foreground hover:bg-transparent hover:text-foreground hover:underline"
                   onClick={onReplaceDataset}
                   type="button"
                   variant="ghost"
