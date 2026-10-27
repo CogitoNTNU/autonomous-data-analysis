@@ -11,7 +11,6 @@ describe("AnalysisQuestionComposer", () => {
         disabled={false}
         hasDataset={false}
         onChange={vi.fn()}
-        onReplaceDataset={vi.fn()}
         onSubmit={vi.fn()}
         question=""
       />,
@@ -30,7 +29,6 @@ describe("AnalysisQuestionComposer", () => {
         disabled={false}
         hasDataset
         onChange={onChange}
-        onReplaceDataset={vi.fn()}
         onSubmit={onSubmit}
         question=""
       />,
@@ -44,7 +42,6 @@ describe("AnalysisQuestionComposer", () => {
         disabled={false}
         hasDataset
         onChange={onChange}
-        onReplaceDataset={vi.fn()}
         onSubmit={onSubmit}
         question=" average mass "
       />,

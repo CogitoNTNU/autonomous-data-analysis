@@ -1,4 +1,4 @@
-import { ArrowUp, Paperclip } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ type AnalysisQuestionComposerProps = {
   finished?: boolean;
   hasDataset: boolean;
   onChange: (question: string) => void;
-  onReplaceDataset: () => void;
   onSubmit: (question: string) => void;
   question: string;
   suggestions?: ReactNode;
@@ -20,7 +19,6 @@ export function AnalysisQuestionComposer({
   finished = false,
   hasDataset,
   onChange,
-  onReplaceDataset,
   onSubmit,
   question,
   suggestions,
@@ -69,16 +67,6 @@ export function AnalysisQuestionComposer({
             value={question}
           />
           <div className="flex items-center">
-            <Button
-              aria-label="Choose another CSV"
-              disabled={!hasDataset}
-              onClick={onReplaceDataset}
-              size="icon"
-              type="button"
-              variant="ghost"
-            >
-              <Paperclip className="size-4" />
-            </Button>
             <span className="ml-1 text-[9px] text-muted-foreground">
               Planning only · no calculations
             </span>

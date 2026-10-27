@@ -84,16 +84,16 @@ export function usePlannerSession(client: PlannerClient = browserPlanner) {
   }
 
   async function acceptDataset(preview: DatasetPreview, file: File) {
-    source.current = null;
-    resetQuestion();
-    setDataset(null);
     try {
       const registered = await client.registerDataset(file);
+      resetQuestion();
       const loaded = { ...preview, datasetId: registered.dataset_id };
       source.current = { file, dataset: loaded };
       setDataset(loaded);
+      return true;
     } catch (reason: unknown) {
       setError(messageFrom(reason));
+      return false;
     }
   }
 

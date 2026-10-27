@@ -52,7 +52,7 @@ describe("App dataset preview flow", () => {
       type: "text/csv",
     });
     await user.upload(screen.getByLabelText("Choose CSV file"), file);
-    await user.click(await screen.findByRole("button", { name: "Replace dataset" }));
+    await user.click(await screen.findByRole("button", { name: "Replace file" }));
 
     expect(
       screen.getByRole("heading", { name: "What are you analyzing?" }),

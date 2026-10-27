@@ -70,7 +70,6 @@ export function App({ planner }: AppProps) {
           finished={session.phase === "complete"}
           hasDataset={session.dataset !== null}
           onChange={session.setQuestion}
-          onReplaceDataset={session.replaceDataset}
           onSubmit={session.submitQuestion}
           question={session.question}
           suggestions={
@@ -95,7 +94,7 @@ function DatasetConversation({
     <>
       <DatasetPreviewPanel
         dataset={dataset}
-        onReplaceDataset={session.replaceDataset}
+        onReplaceDataset={session.acceptDataset}
       />
       {session.submittedQuestion ? (
         <>

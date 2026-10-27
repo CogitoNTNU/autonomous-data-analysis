@@ -1,4 +1,5 @@
-import { FileSpreadsheet, RotateCcw } from "lucide-react";
+import { DatasetReplaceButton } from "@/features/dataset-preview/DatasetReplaceButton";
+import { FileSpreadsheet } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,14 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { formatFileSize } from "@/features/dataset-upload/validate-dataset-file";
 import { AgentMark } from "@/features/workspace/AgentMark";
 import type { DatasetPreview } from "@/types/dataset";
 
 type DatasetPreviewPanelProps = {
   dataset: DatasetPreview;
-  onReplaceDataset: () => void;
+  onReplaceDataset: (preview: DatasetPreview, file: File) => Promise<boolean>;
 };
 
 export function DatasetPreviewPanel({
@@ -41,7 +41,7 @@ export function DatasetPreviewPanel({
             columns. Here&apos;s a quick look at the data:
           </p>
 
-          <Card className="mt-4 overflow-hidden shadow-none">
+          <Card className="mt-4 shadow-none">
             <CardHeader className="flex-row items-center gap-3 space-y-0 border-b p-4">
               <div className="grid size-9 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
                 <FileSpreadsheet className="size-4" />
@@ -57,6 +57,7 @@ export function DatasetPreviewPanel({
               <Badge className="text-[9px]" variant="secondary">
                 CSV
               </Badge>
+              <DatasetReplaceButton onReplace={onReplaceDataset} />
             </CardHeader>
             <CardContent className="p-0">
               {dataset.rows.length > 0 ? (
@@ -103,15 +104,6 @@ export function DatasetPreviewPanel({
               Showing the first {dataset.rows.length} of{" "}
               {dataset.rowCount.toLocaleString()} rows.
             </p>
-            <Button
-              onClick={onReplaceDataset}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <RotateCcw className="size-3.5" />
-              Replace dataset
-            </Button>
           </div>
         </div>
       </div>
