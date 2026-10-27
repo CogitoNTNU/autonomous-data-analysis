@@ -73,10 +73,17 @@ def main(argv: list[str] | None = None) -> int:
                 client, settings.model_name, timeout_seconds=settings.timeout_seconds
             )
             graph = build_graph(registry, planner, interpretation)
-            state = graph.invoke(
-                create_initial_state(args.prompt, dataset),
+            state = create_initial_state(args.prompt, dataset)
+            for event in graph.stream(
+                state,
                 config={"recursion_limit": 10},
-            )
+                stream_mode="updates",
+            ):
+                for node_name, updates in event.items():
+                    print(f"Completed node: {node_name}", flush=True)
+                    # Mirror replacement updates for the final CLI output.
+                    # LangGraph maintains its own execution state.
+                    state.update(updates)
     except (OpenAIError, ValueError, OSError):
         print(
             "Workflow request failed. Check provider connectivity, configuration, and dataset validity.",

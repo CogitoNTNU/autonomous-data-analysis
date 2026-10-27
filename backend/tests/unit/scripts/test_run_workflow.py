@@ -39,7 +39,15 @@ def test_csv_runs_through_real_graph_with_fake_models(monkeypatch, capsys):
     monkeypatch.setattr(run_workflow, "InterpretationLLM", Mock(return_value=interpret))
     monkeypatch.setenv("NTNU_LLM_API_KEY", "test-only")
     assert run_workflow.main(["--dataset", str(path), "--prompt", "Describe age"]) == 0
-    assert "no Critic review" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "no Critic review" in output
+    assert [line for line in output.splitlines() if line.startswith("Completed node:")] == [
+        "Completed node: planner",
+        "Completed node: preprocessing",
+        "Completed node: analysis",
+        "Completed node: interpretation",
+        "Completed node: finish_draft",
+    ]
     client.__exit__.assert_called_once()
 
 
