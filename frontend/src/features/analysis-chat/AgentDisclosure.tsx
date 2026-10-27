@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
 import type { AgentIdentity } from "@/features/analysis-chat/agents";
 import { cn } from "@/lib/utils";
@@ -10,6 +12,7 @@ type AgentDisclosureProps = {
   summary: string;
   children: ReactNode;
   actions?: ReactNode;
+  detailsTitle?: string;
 };
 
 export function AgentDisclosure({
@@ -17,6 +20,7 @@ export function AgentDisclosure({
   summary,
   children,
   actions,
+  detailsTitle,
 }: AgentDisclosureProps) {
   const [open, setOpen] = useState(false);
   const detailsId = `${agent.initials.toLowerCase()}-details`;
@@ -24,10 +28,11 @@ export function AgentDisclosure({
   return (
     <section>
       <AgentTurn agent={agent}>
-        <button
+        <Button
+          variant="ghost"
           aria-controls={detailsId}
           aria-expanded={open}
-          className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-xs"
+          className="flex h-auto w-full items-center gap-2 rounded-md px-0 py-1 text-left text-base font-medium hover:bg-transparent hover:text-muted-foreground"
           onClick={() => setOpen((current) => !current)}
           type="button"
         >
@@ -38,10 +43,17 @@ export function AgentDisclosure({
               open && "rotate-90",
             )}
           />
-        </button>
+        </Button>
         {open && (
           <div className="mt-3" id={detailsId}>
-            {children}
+            {detailsTitle ? (
+              <Card className="overflow-hidden shadow-none">
+                <CardHeader className="border-b p-4">
+                  <CardTitle className="text-lg">{detailsTitle}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">{children}</CardContent>
+              </Card>
+            ) : children}
           </div>
         )}
         {actions}

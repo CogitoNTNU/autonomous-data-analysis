@@ -102,8 +102,8 @@ button {
 }
 
 .thinking-dot {
-  width: 5px;
-  height: 5px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
   background: #2f855f;
   animation: thinking 1.1s ease-in-out infinite;

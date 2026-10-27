@@ -20,14 +20,14 @@ export function ClarificationPrompt({
   return (
     <section aria-labelledby="clarification-question">
       <AgentTurn agent={agents.planner}>
-        <h2 className="text-[13px] font-medium" id="clarification-question">
+        <h2 className="text-lg font-medium" id="clarification-question">
           {clarification.question}
         </h2>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+        <p className="mt-2 text-base leading-7 text-muted-foreground">
           {clarification.description}
         </p>
         {awaitingCustomAnswer ? (
-          <p className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-[10px] text-muted-foreground">
+          <p className="mt-4 rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm leading-6 text-muted-foreground">
             Explain what you mean in the message field below.
           </p>
         ) : (

@@ -96,7 +96,7 @@ describe("App dataset preview flow", () => {
     expect(
       screen.getByText("What is the average body mass by species?", { selector: "p" }),
     ).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("Thinking");
+    expect(screen.getByRole("status", { name: "Thinking" })).toBeVisible();
     expect(screen.getByLabelText("Analysis question")).toBeDisabled();
     await user.click(
       await screen.findByRole("button", {
@@ -134,7 +134,7 @@ describe("App dataset preview flow", () => {
     await user.click(screen.getByRole("button", { name: "Body mass" }));
 
     expect(screen.getByText("Body mass")).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("Thinking");
+    expect(screen.getByRole("status", { name: "Thinking" })).toBeVisible();
     expect(
       await screen.findByRole("button", {
         name: "Prepared an analysis plan, 3 steps",
@@ -200,8 +200,6 @@ describe("App dataset preview flow", () => {
       expect(screen.queryByRole("button", { name: "Prepared an answer" })).toBeNull();
       await user.click(await screen.findByRole("button", { name: label }));
     }
-
-
 
     expect(
       await screen.findByRole("button", { name: "Prepared an answer" }),

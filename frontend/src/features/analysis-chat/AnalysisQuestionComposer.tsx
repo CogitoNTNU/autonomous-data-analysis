@@ -40,17 +40,17 @@ export function AnalysisQuestionComposer({
   }
 
   return (
-    <div className="composer-fade shrink-0 px-5 pb-5 pt-4 sm:px-6">
-      <div className="mx-auto max-w-[760px]">{suggestions}</div>
+    <div className="composer-fade shrink-0 px-4 pb-4 pt-3 sm:px-16">
+      <div className="mx-auto max-w-[800px]">{suggestions}</div>
       <form
         aria-label="Ask about the dataset"
-        className="pointer-events-auto mx-auto max-w-[760px]"
+        className="pointer-events-auto mx-auto max-w-[800px]"
         onSubmit={submitQuestion}
       >
         <div className="rounded-2xl border border-border bg-background p-2 shadow-[0_6px_24px_rgba(0,0,0,0.09)] focus-within:border-ring">
           <Textarea
             aria-label="Analysis question"
-            className="max-h-32 min-h-11 resize-none border-0 px-3 py-2 text-xs leading-5 shadow-none focus-visible:ring-0"
+            className="max-h-32 min-h-11 resize-none border-0 px-3 py-2 text-base leading-7 shadow-none focus-visible:ring-0"
             disabled={!hasDataset || disabled}
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={handleKeyDown}
@@ -81,7 +81,7 @@ export function AnalysisQuestionComposer({
             </Button>
           </div>
         </div>
-        <p className="mt-2 text-center text-[8px] text-muted-foreground">
+        <p className="mt-2 text-center text-sm text-muted-foreground">
           Review the plan before running any analysis.
         </p>
       </form>

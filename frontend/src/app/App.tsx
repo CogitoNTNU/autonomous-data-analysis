@@ -54,14 +54,13 @@ export function App({ planner }: AppProps) {
         <WorkspaceHeader
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          datasetName={session.dataset?.fileName}
           hasDataset={session.dataset !== null}
           onNewAnalysis={session.resetQuestion}
           onToggleTheme={toggleTheme}
           theme={theme}
         />
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[760px] px-5 pb-8 sm:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-16">
+          <div className="mx-auto w-full max-w-[800px] pb-10">
             {session.dataset ? (
               <DatasetConversation dataset={session.dataset} session={session} />
             ) : (
@@ -87,7 +86,10 @@ export function App({ planner }: AppProps) {
           question={session.question}
           suggestions={
             session.dataset && !session.submittedQuestion ? (
-              <QuestionSuggestions dataset={session.dataset} onSelect={session.submitQuestion} />
+              <QuestionSuggestions
+                dataset={session.dataset}
+                onSelect={session.submitQuestion}
+              />
             ) : null
           }
         />
@@ -112,10 +114,7 @@ function DatasetConversation({
   }
   return (
     <>
-      <DatasetPreviewPanel
-        dataset={dataset}
-        onReplaceDataset={session.acceptDataset}
-      />
+      <DatasetPreviewPanel dataset={dataset} onReplaceDataset={session.acceptDataset} />
       {session.submittedQuestion ? (
         <>
           <SubmittedQuestion question={session.submittedQuestion} onEdit={editQuestion} editDisabled={editingDisabled} />
@@ -151,7 +150,7 @@ function PlannerError({
 }) {
   return (
     <AgentTurn agent={agent}>
-      <p className="text-xs text-destructive" role="alert">
+      <p className="text-base leading-7 text-destructive" role="alert">
         {message}
       </p>
     </AgentTurn>

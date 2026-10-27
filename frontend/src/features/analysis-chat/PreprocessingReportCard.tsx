@@ -10,23 +10,23 @@ type PreprocessingReportCardProps = {
 
 export function PreprocessingReportCard({ report, actions }: PreprocessingReportCardProps) {
   return (
-    <AgentDisclosure actions={actions} agent={agents.preprocessing} summary={summary(report)}>
-      <p className="text-xs leading-5">
+    <AgentDisclosure detailsTitle="Preprocessing report" actions={actions} agent={agents.preprocessing} summary={summary(report)}>
+      <p className="text-base leading-7">
         {report.rowsBefore} rows in, {report.rowsAfter} rows out.
       </p>
       {report.changes.length > 0 ? (
-        <ul className="mt-3 space-y-1.5 text-[11px] leading-4 text-muted-foreground">
+        <ul className="mt-3 space-y-1.5 text-base leading-7 text-muted-foreground">
           {report.changes.map((change) => (
             <li key={change}>{change}</li>
           ))}
         </ul>
       ) : (
-        <p className="mt-3 text-[11px] leading-4 text-muted-foreground">
+        <p className="mt-3 text-base leading-7 text-muted-foreground">
           No rows or columns were changed.
         </p>
       )}
       {report.warnings.length > 0 && (
-        <ul className="mt-3 space-y-1 text-[11px] leading-4">
+        <ul className="mt-3 space-y-1 text-base leading-7">
           {report.warnings.map((warning) => (
             <li key={warning}>{warning}</li>
           ))}

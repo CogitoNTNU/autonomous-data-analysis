@@ -16,43 +16,18 @@ import type { usePlannerSession } from "@/features/analysis-chat/usePlannerSessi
 const running = {
   preprocessing: {
     agent: agents.preprocessing,
-    detail: [
-      "Reading the reviewed plan",
-      "Running the preprocessing steps",
-      "Recording what changed",
-    ],
   },
   analysis: {
     agent: agents.analysis,
-    detail: [
-      "Reading the processed dataset",
-      "Running the analysis steps",
-      "Recording the calculated results",
-    ],
   },
   interpretation: {
     agent: agents.interpretation,
-    detail: [
-      "Reading the calculated results",
-      "Connecting them to the question",
-      "Keeping the limitations",
-    ],
   },
   critic: {
     agent: agents.critic,
-    detail: [
-      "Checking the interpretation",
-      "Looking for unsupported claims",
-      "Deciding whether it can stand",
-    ],
   },
   chat: {
     agent: agents.chat,
-    detail: [
-      "Reading the reviewed interpretation",
-      "Keeping the critic's decision",
-      "Preparing the answer",
-    ],
   },
 } as const;
 
@@ -62,7 +37,7 @@ export function WorkflowTurns({ session }: { session: Session }) {
   function nextAction(phase: Session["phase"], label: string) {
     return session.phase === phase ? (
       <div className="mt-3 flex justify-end border-t border-border/50 pt-2">
-        <Button variant="ghost" size="sm" className="gap-2 text-xs text-muted-foreground hover:text-foreground" onClick={() => void session.runNextAgent()}>{label}<ArrowRight aria-hidden="true" className="size-3.5" /></Button>
+        <Button variant="ghost" size="sm" className="gap-2 text-sm text-muted-foreground hover:text-foreground" onClick={() => void session.runNextAgent()}>{label}<ArrowRight aria-hidden="true" className="size-3.5" /></Button>
       </div>
     ) : undefined;
   }
@@ -89,10 +64,10 @@ export function WorkflowTurns({ session }: { session: Session }) {
       )}
       {session.critique && <CriticCard critique={session.critique} actions={nextAction("chat_ready", "Show final answer")} />}
       {session.answer && <ChatAnswerCard answer={session.answer} />}
-      {active && <ThinkingIndicator agent={active.agent} detail={[...active.detail]} />}
+      {active && <ThinkingIndicator agent={active.agent} />}
       {session.phase === "error" && session.error && (
         <AgentTurn agent={session.errorAgent}>
-          <p className="text-xs text-destructive" role="alert">
+          <p className="text-base leading-7 text-destructive" role="alert">
             {session.error}
           </p>
         </AgentTurn>
