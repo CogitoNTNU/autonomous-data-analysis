@@ -48,7 +48,7 @@ export function App({ planner }: AppProps) {
           theme={theme}
         />
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[760px] px-5 pb-44 sm:px-6">
+          <div className="mx-auto w-full max-w-[760px] px-5 pb-8 sm:px-6">
             {session.dataset ? (
               <DatasetConversation dataset={session.dataset} session={session} />
             ) : (
@@ -73,6 +73,11 @@ export function App({ planner }: AppProps) {
           onReplaceDataset={session.replaceDataset}
           onSubmit={session.submitQuestion}
           question={session.question}
+          suggestions={
+            session.dataset && !session.submittedQuestion ? (
+              <QuestionSuggestions dataset={session.dataset} onSelect={session.submitQuestion} />
+            ) : null
+          }
         />
       </main>
     </div>
@@ -113,12 +118,7 @@ function DatasetConversation({
             <PlannerError agent={agents.planner} message={session.error} />
           )}
         </>
-      ) : (
-        <QuestionSuggestions
-          dataset={dataset}
-          onSelect={session.submitQuestion}
-        />
-      )}
+      ) : null}
     </>
   );
 }

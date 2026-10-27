@@ -283,3 +283,7 @@ backend/data/artifacts/*.png
 Thumbs.db
 Desktop.ini
 .vercel
+
+# Track frontend source helpers despite the Python lib/ ignore rule.
+!frontend/src/lib/
+!frontend/src/lib/**

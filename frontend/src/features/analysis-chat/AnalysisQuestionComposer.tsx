@@ -1,5 +1,5 @@
 import { ArrowUp, Paperclip } from "lucide-react";
-import type { FormEvent, KeyboardEvent } from "react";
+import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ type AnalysisQuestionComposerProps = {
   onReplaceDataset: () => void;
   onSubmit: (question: string) => void;
   question: string;
+  suggestions?: ReactNode;
 };
 
 export function AnalysisQuestionComposer({
@@ -22,6 +23,7 @@ export function AnalysisQuestionComposer({
   onReplaceDataset,
   onSubmit,
   question,
+  suggestions,
 }: AnalysisQuestionComposerProps) {
   const canSubmit = hasDataset && !disabled && question.trim().length > 0;
 
@@ -40,7 +42,8 @@ export function AnalysisQuestionComposer({
   }
 
   return (
-    <div className="composer-fade pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-5 pt-12 sm:px-6">
+    <div className="composer-fade shrink-0 px-5 pb-5 pt-4 sm:px-6">
+      <div className="mx-auto max-w-[760px]">{suggestions}</div>
       <form
         aria-label="Ask about the dataset"
         className="pointer-events-auto mx-auto max-w-[760px]"

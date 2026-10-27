@@ -28,6 +28,8 @@ describe("App dataset preview flow", () => {
     const user = userEvent.setup();
     render(<App planner={prototypePlanner} />);
 
+    expect(screen.queryByRole("region", { name: "Suggested questions" })).toBeNull();
+
     const file = new File(
       ["species,island,body_mass_g\nAdelie,Torgersen,3750\nGentoo,Biscoe,5000"],
       "penguins.csv",
@@ -50,9 +52,7 @@ describe("App dataset preview flow", () => {
       type: "text/csv",
     });
     await user.upload(screen.getByLabelText("Choose CSV file"), file);
-    await user.click(
-      await screen.findByRole("button", { name: "Replace dataset" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "Replace dataset" }));
 
     expect(
       screen.getByRole("heading", { name: "What are you analyzing?" }),
@@ -71,14 +71,19 @@ describe("App dataset preview flow", () => {
       { type: "text/csv" },
     );
     await user.upload(screen.getByLabelText("Choose CSV file"), file);
-    await user.click(
-      await screen.findByRole("button", {
-        name: "What is the average body mass by species?",
-      }),
-    );
+    const suggestion = await screen.findByRole("button", {
+      name: "What is the average body mass by species?",
+    });
+    const bar = screen.getByRole("region", { name: "Suggested questions" });
+    const composer = screen.getByRole("form", { name: "Ask about the dataset" });
+    expect(bar.parentElement?.parentElement).toBe(composer.parentElement);
+    expect(bar.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    suggestion.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.queryByRole("region", { name: "Suggested questions" })).toBeNull();
 
     expect(
-      screen.getByText("What is the average body mass by species?"),
+      screen.getByText("What is the average body mass by species?", { selector: "p" }),
     ).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Thinking");
     expect(screen.getByLabelText("Analysis question")).toBeDisabled();
@@ -150,7 +155,7 @@ describe("App dataset preview flow", () => {
     );
 
     expect(
-      screen.getByText("What would you like to learn from this dataset?"),
+      screen.getByRole("region", { name: "Suggested questions" }),
     ).toBeVisible();
     expect(screen.getByLabelText("Analysis question")).toBeEnabled();
     expect(
@@ -179,6 +184,7 @@ describe("App dataset preview flow", () => {
     ).toBeVisible();
     expect(screen.queryByText(/The uploaded CSV is the dataset/)).toBeNull();
     await user.click(screen.getByRole("button", { name: "Continue" }));
+
 
     expect(
       await screen.findByRole("button", { name: "Prepared an answer" }),

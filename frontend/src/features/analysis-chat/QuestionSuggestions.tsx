@@ -32,14 +32,14 @@ export function QuestionSuggestions({
   onSelect,
 }: QuestionSuggestionsProps) {
   return (
-    <div className="ml-12 mt-5">
-      <p className="text-xs font-medium">
-        What would you like to learn from this dataset?
+    <section aria-label="Suggested questions" className="mb-3">
+      <p className="px-1 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        Try asking
       </p>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
         {suggestedQuestions(dataset.columns).map((question) => (
           <button
-            className="rounded-xl border border-border bg-background px-3 py-2 text-left text-[10px] leading-4 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-xl border border-border bg-background px-3 py-3 text-left text-base leading-7 text-muted-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             key={question}
             onClick={() => onSelect(question)}
             type="button"
@@ -48,6 +48,6 @@ export function QuestionSuggestions({
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
