@@ -160,8 +160,16 @@ def smoke_passed(run: SmokeRun, valid_draft: bool) -> bool:
     critique = state["critique"]
     return (
         run.exception_type is None
-        and run.path[:5]
-        == ["planner", "preprocessing", "analysis", "interpretation", "critic"]
+        and run.path[:6]
+        == [
+            "start_run",
+            "planner",
+            "preprocessing",
+            "analysis",
+            "interpretation",
+            "critic",
+        ]
+        and run.path[-1:] == ["finish_run"]
         and state["control"].status == "completed"
         and not state["errors"]
         and valid_draft

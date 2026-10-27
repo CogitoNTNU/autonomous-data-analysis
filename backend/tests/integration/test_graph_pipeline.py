@@ -95,7 +95,7 @@ def test_preprocessing_failure_stops_downstream_nodes(
     failure: Exception,
 ) -> None:
     monkeypatch.setattr(
-        "backend.app.graph.adapters.preprocessing_node", Mock(side_effect=failure)
+        "backend.app.graph.nodes.preprocessing_node", Mock(side_effect=failure)
     )
     state = create_initial_state("Describe age", pipeline_dataset, max_revisions=0)
 
@@ -144,6 +144,8 @@ def test_analysis_gaps_continue_only_with_successful_evidence(
     assert report.skipped_step_ids == ["blocked"]
     assert any(warning.code == "DEPENDENCY_FAILED" for warning in result["warnings"])
     if partial:
+        assert result["control"].status == "completed"
+        assert result["critique"].decision == "approved"
         assert result["errors"] == []
         context = pipeline_models[1].call_args.args[1]
         assert context.evidence.failed_step_ids == ["failed"]

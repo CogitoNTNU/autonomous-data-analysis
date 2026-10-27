@@ -59,7 +59,7 @@ def make_plan() -> Plan:
     )
 
 
-def test_planner_node_writes_plan_to_state_updates():
+def test_planner_node_returns_success_response():
     dataset = make_dataset()
     state = create_initial_state(
         user_query="Compare average body mass across species.",
@@ -71,18 +71,22 @@ def test_planner_node_writes_plan_to_state_updates():
     def fake_model(prompt, context):
         return PlannerOutput(plan=plan)
 
-    updates = planner_node(
+    response = planner_node(
         state=state,
         registry=registry,
         model=fake_model,
     )
 
-    assert updates["plan"] == plan
-    assert updates["clarification_question"] is None
-    assert updates["warnings"] == []
+    assert response.status == "success"
+    assert response.updates.plan == plan
+    assert response.clarification_question is None
+    assert response.warnings == []
+    assert response.error is None
+
+    assert state["plan"] is None
 
 
-def test_planner_node_writes_clarification_to_state_updates():
+def test_planner_node_returns_clarification_response():
     dataset = make_dataset()
     state = create_initial_state(
         user_query="Compare the groups.",
@@ -99,12 +103,43 @@ def test_planner_node_writes_clarification_to_state_updates():
             )
         )
 
-    updates = planner_node(
+    response = planner_node(
         state=state,
         registry=registry,
         model=fake_model,
     )
 
-    assert updates["clarification_question"] == question
-    assert "plan" not in updates
-    assert updates["warnings"] == []
+    assert response.status == "needs_clarification"
+    assert response.clarification_question == question
+    assert response.updates.plan is None
+    assert response.warnings == []
+    assert response.error is None
+
+    assert state["clarification_question"] is None
+    assert state["plan"] is None
+
+
+def test_planner_node_returns_error_for_unknown_column():
+    dataset = make_dataset()
+    state = create_initial_state(
+        user_query="Compare average body mass across species.",
+        dataset=dataset,
+    )
+    registry = make_registry()
+    plan = make_plan().model_copy(update={"required_columns": ["missing_column"]})
+
+    def fake_model(prompt, context):
+        return PlannerOutput(plan=plan)
+
+    response = planner_node(
+        state=state,
+        registry=registry,
+        model=fake_model,
+    )
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert response.error.code == "INVALID_OUTPUT"
+    assert response.updates.plan is None
+    assert state["errors"] == []
+    assert state["plan"] is None

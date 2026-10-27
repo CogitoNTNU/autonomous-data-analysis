@@ -13,7 +13,7 @@ from backend.app.contracts.models import (
     Interpretation,
 )
 from backend.app.contracts.state import create_initial_state
-from backend.app.graph import adapters
+from backend.app.graph import nodes
 
 
 @pytest.mark.parametrize(
@@ -38,12 +38,12 @@ def test_revisions_pass_feedback_without_reexecuting_upstream_nodes(
         )
 
     interpretation.side_effect = interpret
-    preprocessing = Mock(wraps=adapters.preprocessing_node)
-    analysis = Mock(wraps=adapters.analysis_node)
-    review = Mock(wraps=adapters.critic_node)
-    monkeypatch.setattr(adapters, "preprocessing_node", preprocessing)
-    monkeypatch.setattr(adapters, "analysis_node", analysis)
-    monkeypatch.setattr(adapters, "critic_node", review)
+    preprocessing = Mock(wraps=nodes.preprocessing_node)
+    analysis = Mock(wraps=nodes.analysis_node)
+    review = Mock(wraps=nodes.critic_node)
+    monkeypatch.setattr(nodes, "preprocessing_node", preprocessing)
+    monkeypatch.setattr(nodes, "analysis_node", analysis)
+    monkeypatch.setattr(nodes, "critic_node", review)
     feedback = [revision_critique.model_copy(deep=True) for _ in range(revisions)]
     for index, critique in enumerate(feedback):
         critique.issues[0].description += f" Review {index + 1}."
@@ -229,7 +229,7 @@ def test_failed_revision_does_not_reuse_previous_outputs(
         critic.side_effect = [revision_critique, failure("private provider details")]
     state = create_initial_state("Describe age", pipeline_dataset, max_revisions=2)
 
-    result = pipeline_graph.invoke(state, config={"recursion_limit": 12})
+    result = pipeline_graph.invoke(state, config={"recursion_limit": 16})
 
     assert result["control"].status == "error"
     assert result["control"].revision_count == 1

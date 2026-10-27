@@ -30,12 +30,12 @@ def evaluate_case(case: EvalCase, model: CriticModel) -> Critique:
     )
     state["analysis_results"] = [r.model_copy(deep=True) for r in case.results]
     state["interpretation"] = case.interpretation.model_copy(deep=True)
-    state.update(critic_node(state, model))
-    if state["errors"]:
-        raise ValueError("; ".join(f"{e.code}: {e.message}" for e in state["errors"]))
-    if state["critique"] is None:
+    response = critic_node(state, model)
+    if response.error is not None:
+        raise ValueError(f"{response.error.code}: {response.error.message}")
+    if response.updates.critique is None:
         raise ValueError("No critique returned")
-    return state["critique"]
+    return response.updates.critique
 
 
 def run_evaluation(cases: Sequence[EvalCase], model: CriticModel) -> int:

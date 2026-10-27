@@ -8,12 +8,9 @@ from pprint import pprint
 
 from backend.app.agents.analysis import analysis_node
 from backend.app.agents.planner.llm import PlannerLLM
-from backend.app.agents.planner.node import planner_node
-from backend.app.agents.preprocessing import (
-    preprocessing_node,
-    register_preprocessing_tools,
-)
+from backend.app.agents.preprocessing import register_preprocessing_tools
 from backend.app.contracts.state import AgentState, create_initial_state
+from backend.app.graph.nodes import planner_graph_node, preprocessing_graph_node
 from backend.app.storage.datasets import create_dataset_reference
 from backend.app.tools.analysis.descriptive import default_registry
 from backend.app.tools.dataset.inspection import inspection_registry
@@ -66,7 +63,7 @@ def main() -> int:
     registry = register_preprocessing_tools(default_registry())
     state = create_initial_state(args.prompt, dataset)
     state.update(
-        planner_node(
+        planner_graph_node(
             state,
             registry,
             PlannerLLM(inspection_registry=inspection_registry()),
@@ -80,7 +77,7 @@ def main() -> int:
             print("\nPLANNER ERRORS")
             pprint(state["errors"])
         return 1
-    state.update(preprocessing_node(state))
+    state.update(preprocessing_graph_node(state))
     analysis_response = analysis_node(state, registry)
     state["analysis_results"] = analysis_response.updates.analysis_results
     state["artifacts"] = analysis_response.updates.artifacts

@@ -8,9 +8,12 @@ from langgraph.graph.state import CompiledStateGraph
 from backend.app.contracts.models import (
     AnalysisUpdates,
     Critique,
+    CriticUpdates,
     DatasetReference,
     Interpretation,
     InterpretationUpdates,
+    PlannerUpdates,
+    PreprocessingUpdates,
 )
 from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import create_initial_state
@@ -23,7 +26,10 @@ def test_missing_preprocessing_outputs_are_not_silently_accepted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "backend.app.graph.adapters.preprocessing_node", lambda state: {}
+        "backend.app.graph.nodes.preprocessing_node",
+        lambda state: AgentResponse[PreprocessingUpdates](
+            status="success", updates=PreprocessingUpdates()
+        ),
     )
     state = create_initial_state("Describe age", pipeline_dataset, max_revisions=0)
 
@@ -36,7 +42,7 @@ def test_missing_preprocessing_outputs_are_not_silently_accepted(
     pipeline_models[2].assert_not_called()
 
 
-@pytest.mark.parametrize("node", ["analysis", "interpretation"])
+@pytest.mark.parametrize("node", ["planner", "analysis", "interpretation", "critic"])
 def test_success_without_required_output_is_recorded_as_invalid_output(
     pipeline_graph: CompiledStateGraph,
     pipeline_dataset: DatasetReference,
@@ -44,11 +50,16 @@ def test_success_without_required_output_is_recorded_as_invalid_output(
     monkeypatch: pytest.MonkeyPatch,
     node: str,
 ) -> None:
-    updates = AnalysisUpdates() if node == "analysis" else InterpretationUpdates()
+    updates = {
+        "planner": PlannerUpdates(),
+        "analysis": AnalysisUpdates(),
+        "interpretation": InterpretationUpdates(),
+        "critic": CriticUpdates(),
+    }[node]
     incomplete_node = Mock(
         return_value=AgentResponse(status="success", updates=updates)
     )
-    monkeypatch.setattr(f"backend.app.graph.adapters.{node}_node", incomplete_node)
+    monkeypatch.setattr(f"backend.app.graph.nodes.{node}_node", incomplete_node)
     state = create_initial_state("Describe age", pipeline_dataset, max_revisions=0)
     if node == "interpretation":
         state["interpretation"] = Interpretation(summary="Old draft")
@@ -61,14 +72,17 @@ def test_success_without_required_output_is_recorded_as_invalid_output(
     assert error.source == node
     assert error.retryable is False
     assert result["control"].status == "error"
-    assert result["control"].current_agent == node
+    assert result["control"].current_agent is None
     assert result["control"].revision_count == 0
     incomplete_node.assert_called_once()
-    pipeline_models[1].assert_not_called()
+    if node == "critic":
+        pipeline_models[1].assert_called_once()
+    else:
+        pipeline_models[1].assert_not_called()
     pipeline_models[2].assert_not_called()
     if node == "interpretation":
         assert result["interpretation"] is None
-    else:
+    elif node == "analysis":
         assert result["analysis_execution_report"] is None
 
 
@@ -93,12 +107,12 @@ def test_revision_without_interpretation_clears_previous_outputs_and_stops(
         ]
     )
     monkeypatch.setattr(
-        "backend.app.graph.adapters.interpretation_node", interpretation_node
+        "backend.app.graph.nodes.interpretation_node", interpretation_node
     )
     pipeline_models[2].return_value = revision_critique
     state = create_initial_state("Describe age", pipeline_dataset, max_revisions=2)
 
-    result = pipeline_graph.invoke(state, config={"recursion_limit": 12})
+    result = pipeline_graph.invoke(state, config={"recursion_limit": 16})
 
     assert result["interpretation"] is None
     assert result["critique"] is None

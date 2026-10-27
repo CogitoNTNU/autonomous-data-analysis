@@ -10,11 +10,12 @@ from backend.app.contracts.models import (
     DatasetReference,
     Plan,
     PlanStep,
-    PreprocessingReport,
+    PreprocessingUpdates,
     WarningEvent,
 )
+from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import AgentState, create_initial_state
-from backend.app.graph import adapters
+from backend.app.graph import nodes
 
 
 @pytest.mark.parametrize("outcome", ["approved", "revised", "interpretation_failed"])
@@ -49,16 +50,18 @@ def test_partial_analysis_preserves_distinct_original_warnings_without_sanitized
             "A different preprocessing limitation.",
         )
     ]
-    original_preprocessing = adapters.preprocessing_node
+    original_preprocessing = nodes.preprocessing_node
 
-    def preprocess(state: AgentState) -> dict[str, object]:
-        updates = original_preprocessing(state)
-        report = updates["preprocessing_report"]
-        assert isinstance(report, PreprocessingReport)
+    def preprocess(state: AgentState) -> AgentResponse[PreprocessingUpdates]:
+        response = original_preprocessing(state)
+        report = response.updates.preprocessing_report
+        assert report is not None
         report.warnings.extend(preprocessing_warnings)
-        return updates
+        return response.model_copy(
+            update={"warnings": [*response.warnings, *preprocessing_warnings]}
+        )
 
-    monkeypatch.setattr(adapters, "preprocessing_node", preprocess)
+    monkeypatch.setattr(nodes, "preprocessing_node", preprocess)
     if outcome == "revised":
         pipeline_models[2].side_effect = [
             revision_critique,
@@ -69,17 +72,17 @@ def test_partial_analysis_preserves_distinct_original_warnings_without_sanitized
     state = create_initial_state("Describe age", pipeline_dataset, max_revisions=1)
     state["warnings"] = [prior_warning]
 
-    result = pipeline_graph.invoke(state, config={"recursion_limit": 12})
+    result = pipeline_graph.invoke(state, config={"recursion_limit": 16})
 
     assert result["analysis_execution_report"].outcome == "partial"
     expected = [
         prior_warning,
+        *preprocessing_warnings,
         *(
             warning
             for analysis in result["analysis_results"]
             for warning in analysis.warnings
         ),
-        *preprocessing_warnings,
     ]
     assert result["warnings"] == expected
     failures = [

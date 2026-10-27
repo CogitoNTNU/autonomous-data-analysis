@@ -19,6 +19,7 @@ from backend.app.contracts.models import (
     Plan,
 )
 from backend.app.contracts.state import create_initial_state
+from backend.app.graph.responses import translate_agent_response
 
 DEFAULT_BASE_URL = "https://llm.hpc.ntnu.no/v1"
 DEFAULT_MODEL = "openai/gpt-oss-120b"
@@ -98,7 +99,7 @@ def main() -> int:
         state = example_state(summary)
 
         try:
-            updates = critic_node(state, model)
+            response = critic_node(state, model)
         except Exception as exc:
             print(
                 f"Critic call failed ({type(exc).__name__}): {exc}",
@@ -106,7 +107,7 @@ def main() -> int:
             )
             return 1
 
-        state.update(updates)
+        state.update(translate_agent_response(state, response))
 
         if state["errors"]:
             print("Critic returned errors:", file=sys.stderr)

@@ -22,11 +22,13 @@ def test_smoke_runner_reports_full_workflow_and_validates_citations(
 
     assert smoke.smoke_passed(run, valid)
     assert run.path == [
+        "start_run",
         "planner",
         "preprocessing",
         "analysis",
         "interpretation",
         "critic",
+        "finish_run",
     ]
     output = capsys.readouterr().out
     assert "Final status: completed" in output
@@ -96,7 +98,7 @@ def test_smoke_failure_report_does_not_print_provider_details_or_credentials(
 
     output = capsys.readouterr().out
     assert "Execution exception: RuntimeError" in output
-    assert "START -> ABORTED" in output
+    assert "START -> start_run -> ABORTED" in output
     assert "Smoke result: FAIL" in output
     assert "private-provider-details" not in output
     assert "secret-test-key" not in output

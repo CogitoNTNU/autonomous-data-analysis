@@ -1,16 +1,17 @@
 """Run the existing analysis workflow and evaluate real results with Critic."""
 
-from backend.app.agents.analysis import analysis_node
 from backend.app.agents.critic.llm import CriticLLM
 from backend.app.agents.critic.node import critic_node
 from backend.app.agents.planner.llm import PlannerLLM
-from backend.app.agents.planner.node import planner_node
-from backend.app.agents.preprocessing import (
-    preprocessing_node,
-    register_preprocessing_tools,
-)
+from backend.app.agents.preprocessing import register_preprocessing_tools
 from backend.app.contracts.models import Finding, Interpretation
 from backend.app.contracts.state import create_initial_state
+from backend.app.graph.nodes import (
+    analysis_graph_node,
+    planner_graph_node,
+    preprocessing_graph_node,
+)
+from backend.app.graph.responses import translate_agent_response
 from backend.app.storage.datasets import create_dataset_reference
 from backend.app.tools.analysis.descriptive import default_registry
 from backend.app.tools.dataset.inspection import inspection_registry
@@ -31,7 +32,7 @@ def main() -> int:
 
     # Run the existing pipeline.
     state.update(
-        planner_node(
+        planner_graph_node(
             state,
             registry,
             PlannerLLM(inspection_registry=inspection_registry()),
@@ -44,12 +45,12 @@ def main() -> int:
         print("Errors:", state["errors"])
         return 1
 
-    state.update(preprocessing_node(state))
+    state.update(preprocessing_graph_node(state))
     if state["errors"]:
         print("Preprocessing errors:", state["errors"])
         return 1
 
-    state.update(analysis_node(state, registry))
+    state.update(analysis_graph_node(state, registry))
     if state["errors"]:
         print("Analysis errors:", state["errors"])
         return 1
@@ -100,7 +101,7 @@ def main() -> int:
         print(f"\n=== {label} INTERPRETATION ===")
         print(summary)
 
-        state.update(critic_node(state, model))
+        state.update(translate_agent_response(state, critic_node(state, model)))
 
         if state["errors"]:
             print("Critic errors:", state["errors"])

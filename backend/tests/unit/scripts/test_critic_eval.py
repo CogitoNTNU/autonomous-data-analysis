@@ -9,7 +9,8 @@ import pytest
 
 from backend.app.agents.critic.agent import CriticContext
 from backend.app.agents.critic.llm import CriticLLM
-from backend.app.contracts.models import Critique, PlanStep
+from backend.app.contracts.models import CriticUpdates, Critique, PlanStep
+from backend.app.contracts.responses import AgentResponse
 from backend.app.storage.datasets import create_dataset_reference
 from backend.app.tools.analysis.descriptive import default_registry
 from backend.app.tools.registry import execute_step
@@ -161,7 +162,13 @@ def test_all_execution_failures_have_no_decision_accuracy(
     failure, monkeypatch, capsys
 ) -> None:
     if failure == "missing_critique":
-        monkeypatch.setattr(critic_eval, "critic_node", lambda state, model: {})
+        monkeypatch.setattr(
+            critic_eval,
+            "critic_node",
+            lambda state, model: AgentResponse[CriticUpdates](
+                status="success", updates=CriticUpdates()
+            ),
+        )
 
     def fake_model(prompt: str, context: CriticContext) -> Critique:
         raise ValueError("invalid JSON")
