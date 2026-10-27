@@ -51,6 +51,7 @@ export type CritiqueAsk = InterpretationAsk & {
 export type AnswerAsk = {
   interpretation: InterpretationView;
   critique: CritiqueView;
+  artifacts: AnalysisReport["artifacts"];
 };
 
 export type PlannerClient = {

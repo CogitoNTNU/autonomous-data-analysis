@@ -11,7 +11,10 @@ export function InterpretationCard({
   return (
     <AgentDisclosure agent={agents.interpretation} summary="Interpretation finished">
       <p className="text-xs leading-5">{interpretation.summary}</p>
-      <TextList items={interpretation.findings} title="Findings" />
+      <TextList
+        items={interpretation.findings.map((finding) => finding.claim)}
+        title="Findings"
+      />
       <TextList items={interpretation.limitations} title="Limitations" />
     </AgentDisclosure>
   );

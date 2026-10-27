@@ -77,9 +77,14 @@ export type AnalysisReport = {
   artifacts: { artifact_id: string; type: string }[];
 };
 
+export type FindingView = {
+  claim: string;
+  resultIds: string[];
+};
+
 export type InterpretationView = {
   summary: string;
-  findings: string[];
+  findings: FindingView[];
   limitations: string[];
   unanswered: string[];
   source: Record<string, unknown>;
@@ -94,5 +99,8 @@ export type CritiqueView = {
 
 export type ChatAnswer = {
   text: string;
+  findings: FindingView[];
+  limitations: string[];
+  figureIds: string[];
   followUps: string[];
 };

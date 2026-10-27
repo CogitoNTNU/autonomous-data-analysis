@@ -10,6 +10,7 @@ type AgentDisclosureProps = {
   summary: string;
   children: ReactNode;
   actions?: ReactNode;
+  defaultOpen?: boolean;
 };
 
 export function AgentDisclosure({
@@ -17,8 +18,9 @@ export function AgentDisclosure({
   summary,
   children,
   actions,
+  defaultOpen = false,
 }: AgentDisclosureProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const detailsId = `${agent.initials.toLowerCase()}-details`;
 
   return (

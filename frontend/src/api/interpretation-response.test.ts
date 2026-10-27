@@ -17,7 +17,7 @@ describe("mapInterpretationPayload", () => {
     ).toMatchObject({
       interpretation: {
         summary: "One row remains.",
-        findings: ["Age is 20."],
+        findings: [{ claim: "Age is 20.", resultIds: ["summarize"] }],
         limitations: ["The sample is small."],
       },
     });

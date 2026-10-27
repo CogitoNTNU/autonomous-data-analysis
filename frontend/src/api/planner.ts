@@ -93,19 +93,45 @@ async function critique(input: CritiqueAsk): Promise<CritiqueResult> {
 }
 
 async function present(input: AnswerAsk): Promise<AnswerResult> {
-  return mapAnswerPayload(
-    await postJson("/api/chat", {
-      interpretation: {
-        summary: input.interpretation.summary,
-        limitations: input.interpretation.limitations,
-        unanswered_questions: input.interpretation.unanswered,
-      },
-      critique: {
-        decision: input.critique.decision,
-        required_changes: input.critique.requiredChanges,
-      },
-    }),
-  );
+  return mapAnswerPayload(await postJson("/api/chat", chatBody(input)));
+}
+
+function chatBody(input: AnswerAsk) {
+  return {
+    interpretation: {
+      summary: input.interpretation.summary,
+      findings: presentedFindings(input.interpretation.findings),
+      limitations: input.interpretation.limitations,
+      unanswered_questions: input.interpretation.unanswered,
+    },
+    critique: {
+      decision: input.critique.decision,
+      required_changes: input.critique.requiredChanges,
+    },
+    artifacts: presentedArtifacts(input.artifacts),
+  };
+}
+
+function presentedFindings(findings: AnswerAsk["interpretation"]["findings"]) {
+  return findings.flatMap((finding) => {
+    const resultIds = finding.resultIds.filter((id) => id.trim().length > 0);
+    if (finding.claim.trim().length === 0 || resultIds.length === 0) {
+      return [];
+    }
+    return [{ claim: finding.claim, result_ids: resultIds }];
+  });
+}
+
+function presentedArtifacts(artifacts: AnswerAsk["artifacts"]) {
+  return artifacts.flatMap((artifact) => {
+    if (artifact.type !== "figure" && artifact.type !== "table") {
+      return [];
+    }
+    if (artifact.artifact_id.trim().length === 0) {
+      return [];
+    }
+    return [{ artifact_id: artifact.artifact_id, type: artifact.type }];
+  });
 }
 
 function isRegistration(payload: unknown): payload is { dataset_id: string } {

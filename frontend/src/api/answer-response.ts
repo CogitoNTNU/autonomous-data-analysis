@@ -23,6 +23,31 @@ function toAnswer(value: unknown): ChatAnswer {
   }
   return {
     text: requiredText(value.text, "Chat"),
+    findings: findings(value.findings),
+    limitations: requiredStrings(value.limitations),
+    figureIds: requiredStrings(value.artifact_ids),
     followUps: stringList(value.follow_up_suggestions),
   };
+}
+
+function findings(value: unknown): ChatAnswer["findings"] {
+  return requiredList(value).flatMap((item) => {
+    if (!isRecord(item) || typeof item.claim !== "string" || !item.claim.trim()) {
+      return [];
+    }
+    return [{ claim: item.claim, resultIds: stringList(item.result_ids) }];
+  });
+}
+
+function requiredStrings(value: unknown): string[] {
+  return requiredList(value).filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+}
+
+function requiredList(value: unknown): unknown[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Chat returned an unreadable response");
+  }
+  return value;
 }

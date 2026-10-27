@@ -81,7 +81,6 @@ describe("App prepared plan flow", () => {
         "prepare (select_columns): Kept the columns used by the question.",
       ),
     ).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Prepared an answer" }));
     expect(screen.getByText("The prepared columns can be compared.")).toBeVisible();
   });
 });

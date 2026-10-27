@@ -75,10 +75,15 @@ function prototypeAnalysis(): AnalysisReport {
   };
 }
 
+const preparedFinding = {
+  claim: "The question can use the prepared columns.",
+  resultIds: ["compare"],
+};
+
 function prototypeInterpretation(): InterpretationView {
   return {
     summary: "The prepared columns can be compared.",
-    findings: ["The question can use the prepared columns."],
+    findings: [preparedFinding],
     limitations: [],
     unanswered: [],
     source: { summary: "The prepared columns can be compared." },
@@ -97,6 +102,9 @@ function prototypeCritique(): CritiqueView {
 function prototypeAnswer(): ChatAnswer {
   return {
     text: "The prepared columns can be compared.",
+    findings: [preparedFinding],
+    limitations: [],
+    figureIds: [],
     followUps: [],
   };
 }

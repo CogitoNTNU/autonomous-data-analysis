@@ -65,6 +65,7 @@ export async function continueReviewedPlan(
     const presented = await client.present({
       interpretation: interpreted.interpretation,
       critique: reviewed.critique,
+      artifacts: analyzed.analysis.artifacts,
     });
     if (presented.status === "error") {
       publish({ phase: "error", message: presented.message, agent });

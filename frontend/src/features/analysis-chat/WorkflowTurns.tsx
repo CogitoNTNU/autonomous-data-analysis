@@ -77,7 +77,12 @@ export function WorkflowTurns({ session }: { session: Session }) {
         <InterpretationCard interpretation={session.interpretation} />
       )}
       {session.critique && <CriticCard critique={session.critique} />}
-      {session.answer && <ChatAnswerCard answer={session.answer} />}
+      {session.answer && (
+        <ChatAnswerCard
+          answer={session.answer}
+          figures={session.analysis?.figures ?? []}
+        />
+      )}
       {active && <ThinkingIndicator agent={active.agent} detail={[...active.detail]} />}
       {session.phase === "error" && session.error && (
         <AgentTurn agent={session.errorAgent}>

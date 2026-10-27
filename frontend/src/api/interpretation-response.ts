@@ -33,7 +33,7 @@ function toInterpretation(value: unknown): InterpretationView {
   };
 }
 
-function findings(value: unknown): string[] {
+function findings(value: unknown): InterpretationView["findings"] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -41,6 +41,6 @@ function findings(value: unknown): string[] {
     if (!isRecord(item) || typeof item.claim !== "string" || !item.claim.trim()) {
       return [];
     }
-    return [item.claim];
+    return [{ claim: item.claim, resultIds: stringList(item.result_ids) }];
   });
 }
