@@ -7,5 +7,3 @@
 **/__pycache__
 frontend/node_modules
 frontend/dist
-backend/uv.lock
-backend/pyproject.toml

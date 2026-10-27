@@ -11,7 +11,9 @@ _ROOT = str(Path(__file__).resolve().parents[1])
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-import matplotlib  # noqa: E402, F401 - the hosted analysis bundle must include matplotlib
+import matplotlib  # noqa: E402 - the hosted analysis bundle must include matplotlib
+
+matplotlib.use("Agg")
 
 from backend.app.api.vercel_entry import handle_post  # noqa: E402
 
