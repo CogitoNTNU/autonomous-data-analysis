@@ -1,3 +1,4 @@
+import { AnalysisChart } from "@/features/analysis-chat/AnalysisChart";
 import type { ReactNode } from "react";
 import { AgentDisclosure } from "@/features/analysis-chat/AgentDisclosure";
 import { agents } from "@/features/analysis-chat/agents";
@@ -33,14 +34,17 @@ export function AnalysisReportCard({ analysis, actions }: { analysis: AnalysisRe
           No analysis steps were run.
         </p>
       )}
-      {analysis.figures.map((figure) => (
-        <img
-          alt="Analysis chart"
-          className="mt-3 max-w-full rounded-lg border border-border"
-          key={figure.id}
-          src={figure.image}
-        />
-      ))}
+      {analysis.figures.length > 0 && (
+        <div className="mt-5 space-y-5">
+          {analysis.figures.map((figure, index) => (
+            <AnalysisChart
+              key={figure.id}
+              figure={figure}
+              label={analysis.figures.length === 1 ? "Analysis chart" : `Analysis chart ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
       <WarningList warnings={analysis.warnings} />
     </AgentDisclosure>
   );
