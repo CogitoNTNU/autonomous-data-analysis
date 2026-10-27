@@ -1,3 +1,4 @@
+import { ChatScrollArea } from "@/features/analysis-chat/ChatScrollArea";
 import { useState } from "react";
 import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
 import { agents } from "@/features/analysis-chat/agents";
@@ -59,7 +60,7 @@ export function App({ planner }: AppProps) {
           onToggleTheme={toggleTheme}
           theme={theme}
         />
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-16">
+        <ChatScrollArea>
           <div className="mx-auto w-full max-w-[800px] pb-10">
             {session.dataset ? (
               <DatasetConversation dataset={session.dataset} session={session} />
@@ -76,7 +77,7 @@ export function App({ planner }: AppProps) {
               </>
             )}
           </div>
-        </div>
+        </ChatScrollArea>
         <AnalysisQuestionComposer
           disabled={waiting || session.dataset === null}
           finished={session.phase === "complete"}
