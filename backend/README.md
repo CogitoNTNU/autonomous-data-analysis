@@ -57,3 +57,46 @@ and proxy `/api/datasets` and `/api/workflows*` to the persistent backend; the
 bundled workflow functions return an explicit 503 until this routing is configured.
 The earlier individual-agent endpoints remain for compatibility, but the chat no
 longer uses them.
+
+## Model latency and request budgets
+
+All three LLM adapters read the same validated settings. SDK retries are disabled;
+LangGraph owns retries, with one retry for transient failures in a web run. A
+failed Interpretation retry reuses its client and calculated evidence; it does
+not repeat preprocessing or analysis.
+
+| Setting                     | Default                       | Meaning                                                                      |
+| --------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `NTNU_LLM_TIMEOUT_SECONDS`  | `120`                         | Timeout for model HTTP operations, including the response read               |
+| `NTNU_LLM_MAX_TOKENS`       | `4096`                        | Completion budget, including generated reasoning where supported             |
+| `NTNU_LLM_REASONING_EFFORT` | `low` for GLM-5.3 and GPT-OSS | Reasoning effort; other model families receive no override unless configured |
+
+GLM-5.3 defaults to maximum reasoning when effort is omitted; its supported
+values are `low`, `high`, and `max` (see the
+[model card](https://huggingface.co/Inferact/GLM-5.3-NVFP4#note)). Low effort is
+appropriate for explaining already calculated results and reviewing them. The
+application preserves evidence and required limitations. A response cut short by
+the completion budget still fails validation explicitly; it is never presented
+as a complete answer. These request controls do not remove provider queueing.
+
+The backend console logs JSON events with run ID, agent, attempt number, duration,
+and error category. Look for `workflow.node_started` and
+`workflow.node_finished` to distinguish model latency from repeated attempts.
+Prompts, raw data, and credentials are excluded from these timing records.
+Restart the backend after changing environment settings.
+
+## Counts in grouped results and charts
+
+`group_aggregate` reports the number of source observations as `sample_size`,
+the number of output groups as `group_count`, and row counts for each group as
+`group_sizes` (aligned with `groups`). Group row counts are not per-column
+nonmissing counts. A chart consuming those groups retains the source
+`sample_size` and records its aggregate input rows separately as `input_row_count`.
+A three-bar chart based on 342 observations therefore reports 342 observations,
+not a sample of three. Data-quality warnings use the observation count.
+
+The browser displays the calculated group table and available group counts in
+the Analysis details and final answer. Interpretation and Critic constrain group
+comparisons to the observed groups; descriptive differences alone do not imply
+statistical significance. Workflow execution is partial only when steps failed
+or were skipped; result warnings are preserved separately.

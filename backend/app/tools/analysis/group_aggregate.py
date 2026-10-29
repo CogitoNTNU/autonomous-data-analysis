@@ -33,6 +33,13 @@ class GroupAggregateInput(BaseModel):
     group_by: list[str] = Field(min_length=1)
     aggregations: list[Aggregation] = Field(min_length=1)
 
+    @property
+    def numeric_columns(self) -> list[str]:
+        """Counting observed values works for categorical columns too."""
+        return sorted(
+            {item.column for item in self.aggregations if item.function != "count"}
+        )
+
     @model_validator(mode="after")
     def validate_names(self) -> "GroupAggregateInput":
         if len(self.group_by) != len(set(self.group_by)):
@@ -118,11 +125,8 @@ def run(dataset: DatasetReference, **kwargs: object) -> dict[str, object]:
         )
         for aggregation in request.aggregations
     }
-    grouped = (
-        frame.groupby(request.group_by, dropna=False, sort=True)
-        .agg(**named_aggregations)
-        .reset_index()
-    )
+    source_groups = frame.groupby(request.group_by, dropna=False, sort=True)
+    grouped = source_groups.agg(**named_aggregations).reset_index()
     if len(grouped) > MAX_INLINE_GROUPS:
         raise ValueError(
             f"group aggregate produced {len(grouped)} groups; "
@@ -131,6 +135,7 @@ def run(dataset: DatasetReference, **kwargs: object) -> dict[str, object]:
     return {
         "groups": _records(grouped),
         "group_count": len(grouped),
+        "group_sizes": [int(size) for size in source_groups.size().tolist()],
         "sample_size": len(frame),
         "warnings": _missing_warnings(frame, request),
     }
@@ -140,7 +145,8 @@ TOOL = Tool(
     name="group_aggregate",
     description=(
         "Group rows by one or more columns and calculate named count, mean, median, "
-        "sum, min, max, or std aggregations. Required: group_by, aggregations."
+        "sum, min, max, or std aggregations. count accepts any column datatype; "
+        "other aggregations require numeric columns. Required: group_by, aggregations."
     ),
     input_model=GroupAggregateInput,
     accepted_dtypes=frozenset({"integer", "float"}),

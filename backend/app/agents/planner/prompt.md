@@ -88,6 +88,13 @@ Never:
 - assume a column's semantic meaning beyond what is supported by metadata
 - assume a numeric column is suitable for a particular method without checking its metadata
 
+For `group_aggregate`, categorical columns such as `species` may be grouping
+keys and may be counted with `count`. Every other aggregation must use a numeric
+column. For example, compare body mass using `mean` or `max` on `body_mass_g`,
+and use `count` on `species` if a sample count is needed. Do not use `mean`,
+`sum`, or `std` on the species names themselves. `descriptive_statistics` also
+requires numeric columns; use `categorical_analysis` to summarize categories.
+
 Raw datasets are immutable.
 
 If preprocessing is required, add preprocessing steps to the plan rather than

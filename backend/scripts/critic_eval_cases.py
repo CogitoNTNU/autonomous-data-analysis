@@ -81,6 +81,7 @@ def build_cases() -> tuple[EvalCase, ...]:
                 {"region": "South", "revenue_usd": 6000, "orders": 20},
             ],
             "group_count": 2,
+            "group_sizes": [40, 20],
             "status": "ok",
         },
     )

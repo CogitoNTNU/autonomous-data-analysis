@@ -100,3 +100,76 @@ def test_group_aggregate_rejects_non_numeric_aggregation_column():
 
     assert result.values["code"] == "INVALID_DATA"
     assert "segment" in result.values["error"]
+
+
+def test_group_aggregate_counts_text_and_aggregates_numbers_in_the_same_step():
+    result = execute_step(
+        PlanStep(
+            step_id="group",
+            tool_name="group_aggregate",
+            arguments={
+                "group_by": ["region"],
+                "aggregations": [
+                    {"column": "segment", "function": "count", "alias": "observed"},
+                    {"column": "revenue", "function": "mean", "alias": "mean_revenue"},
+                ],
+            },
+        ),
+        _dataset(),
+        default_registry(),
+    )
+
+    assert result.values["status"] != "failed"
+    assert result.values["groups"] == [
+        {"region": "North", "observed": 2, "mean_revenue": 10.0},
+        {"region": "South", "observed": 1, "mean_revenue": 30.0},
+        {"region": None, "observed": 1, "mean_revenue": 40.0},
+    ]
+
+
+def test_count_still_rejects_an_unknown_column_before_execution():
+    from unittest.mock import Mock
+    from dataclasses import replace
+    from backend.app.tools.analysis.group_aggregate import TOOL
+    from backend.app.tools.registry import ToolRegistry
+
+    run_tool = Mock()
+    registry = ToolRegistry()
+    registry.register(replace(TOOL, run=run_tool))
+    result = execute_step(
+        PlanStep(
+            step_id="count",
+            tool_name="group_aggregate",
+            arguments={
+                "group_by": ["region"],
+                "aggregations": [
+                    {"column": "missing", "function": "count", "alias": "n"}
+                ],
+            },
+        ),
+        _dataset(),
+        registry,
+    )
+
+    assert result.values["code"] == "MISSING_COLUMN"
+    run_tool.assert_not_called()
+
+
+def test_numeric_aggregation_of_the_same_counted_text_column_is_rejected():
+    result = execute_step(
+        PlanStep(
+            step_id="mixed",
+            tool_name="group_aggregate",
+            arguments={
+                "group_by": ["region"],
+                "aggregations": [
+                    {"column": "segment", "function": "count", "alias": "n"},
+                    {"column": "segment", "function": "mean", "alias": "invalid_mean"},
+                ],
+            },
+        ),
+        _dataset(),
+        default_registry(),
+    )
+
+    assert result.values["code"] == "INVALID_DATA"

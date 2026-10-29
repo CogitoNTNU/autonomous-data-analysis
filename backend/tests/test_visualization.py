@@ -246,3 +246,74 @@ def test_bar_chart_consumes_group_aggregate_output(tmp_path, monkeypatch):
     assert chart.values["source_result_ids"] == [aggregate.result_id]
     artifact = engine.response.updates.artifacts[0]
     assert Path(artifact.storage_ref).read_bytes().startswith(b"\x89PNG")
+
+
+def test_aggregate_chart_keeps_342_observations_separate_from_three_groups(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "backend.app.tools.analysis.files.ALLOWED_DATA_DIRECTORIES", (tmp_path,)
+    )
+    monkeypatch.setattr("backend.app.tools.visualization.load.ALLOWED", (tmp_path,))
+    monkeypatch.setattr(
+        "backend.app.tools.visualization.figure.DEFAULT_ARTIFACTS", tmp_path
+    )
+    path = tmp_path / "observations.csv"
+    path.write_text(
+        "species,mass\n"
+        + "Adelie,3700\n" * 151
+        + "Chinstrap,3733\n" * 68
+        + "Gentoo,5076\n" * 123
+    )
+    dataset = DatasetReference(
+        dataset_id="sample",
+        version="v1",
+        storage_ref=str(path),
+        schema={"species": {"datatype": "string"}, "mass": {"datatype": "integer"}},
+    )
+    engine = run_analysis(
+        dataset,
+        [
+            PlanStep(
+                step_id="aggregate",
+                tool_name="group_aggregate",
+                arguments={
+                    "group_by": ["species"],
+                    "aggregations": [
+                        {"column": "mass", "function": "mean", "alias": "mean_mass"}
+                    ],
+                },
+            ),
+            PlanStep(
+                step_id="chart",
+                tool_name="bar_chart",
+                arguments={"title": "Mean mass", "x": "species", "y": "mean_mass"},
+                depends_on=["aggregate"],
+            ),
+        ],
+    )
+
+    aggregate, chart = engine.response.updates.analysis_results
+    assert aggregate.values["group_sizes"] == [151, 68, 123]
+    assert aggregate.values["group_count"] == 3
+    assert aggregate.sample_size == chart.sample_size == 342
+    assert chart.values["input_row_count"] == 3
+    assert chart.values["source_result_ids"] == [aggregate.result_id]
+    assert chart.warnings == []
+    assert aggregate.values["status"] == chart.values["status"] == "ok"
+    assert engine.response.updates.execution_report.outcome == "complete"
+
+
+def test_derived_chart_rejects_missing_observation_count_before_drawing(tmp_path):
+    import pytest
+
+    with pytest.raises(ValueError, match="source sample size"):
+        run_bar(
+            _dataset(),
+            output_dir=tmp_path,
+            title="Means",
+            x="city",
+            y="sales",
+            _source_rows=[{"city": "Oslo", "sales": 100}],
+        )
+    assert list(tmp_path.glob("*.png")) == []

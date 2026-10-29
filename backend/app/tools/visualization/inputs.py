@@ -59,6 +59,6 @@ class XYNumericAxesInput(AxesInput):
 
 def parse_chart(model: type[ChartInput], kwargs: dict[str, object]) -> ChartInput:
     # execute_step dytter inn random_state etter validering, den hører ikke til diagrammet
-    skipped = {"_source_rows", "random_state", "output_dir"}
+    skipped = {"_source_rows", "_source_sample_size", "random_state", "output_dir"}
     payload = {key: value for key, value in kwargs.items() if key not in skipped}
     return model.model_validate(payload)

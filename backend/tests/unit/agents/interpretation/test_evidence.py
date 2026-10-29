@@ -203,3 +203,66 @@ def test_empty_results_record_missing_step(request_data):
 
     assert evidence.results == []
     assert evidence.missing_step_ids == ["describe"]
+
+
+def test_group_scope_is_preserved_without_confusing_groups_with_observations(
+    request_data,
+):
+    from backend.app.agents.interpretation.context import build_context
+    from backend.app.agents.interpretation.validation import preserve_required_context
+    from backend.app.contracts.models import Interpretation, Finding
+
+    step = PlanStep(
+        step_id="groups",
+        tool_name="group_aggregate",
+        arguments={
+            "group_by": ["species"],
+            "aggregations": [
+                {"column": "mass", "function": "mean", "alias": "mean_mass"}
+            ],
+        },
+    )
+    request_data.plan.analysis_steps = [step]
+    request_data.analysis_results = [
+        AnalysisResult(
+            result_id="r1",
+            step_id="groups",
+            dataset_version="v1",
+            method="group_aggregate",
+            parameters=step.arguments,
+            values={
+                "status": "ok",
+                "group_count": 3,
+                "group_sizes": [151, 68, 123],
+                "groups": [
+                    {"species": "Adelie", "mean_mass": 3700},
+                    {"species": "Chinstrap", "mean_mass": 3733},
+                    {"species": "Gentoo", "mean_mass": 5076},
+                ],
+            },
+            sample_size=342,
+        )
+    ]
+    evidence = prepare_evidence(request_data)
+    context = build_context(request_data, evidence)
+    draft = Interpretation(
+        summary="Gentoo have the greatest average mass among the three species in this dataset.",
+        findings=[
+            Finding(
+                claim="Gentoo have the greatest observed average mass.",
+                result_ids=["r1"],
+            )
+        ],
+    )
+    result = preserve_required_context(draft, context)
+
+    assert evidence.results[0].sample_size == 342
+    assert evidence.warnings == []
+    assert (
+        "Comparisons are limited to the 3 observed groups in this dataset."
+        in result.limitations
+    )
+    assert not any(
+        "partial" in limitation or "LOW_SAMPLE_SIZE" in limitation
+        for limitation in result.limitations
+    )

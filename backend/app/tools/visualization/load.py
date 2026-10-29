@@ -30,6 +30,16 @@ def runtime_source_rows(
     return rows
 
 
+def observation_count(kwargs: dict[str, object], input_row_count: int) -> int:
+    """Count source observations, never aggregated rows, for derived charts."""
+    if kwargs.get("_source_rows") is None:
+        return input_row_count
+    count = kwargs.get("_source_sample_size")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise ValueError("Derived charts require a valid source sample size")
+    return count
+
+
 def dataset_path(storage_ref: str) -> Path:
     raw = Path(storage_ref)
     candidates = [raw] if raw.is_absolute() else [root / raw for root in ALLOWED]

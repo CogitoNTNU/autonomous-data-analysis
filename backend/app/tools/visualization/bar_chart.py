@@ -13,6 +13,7 @@ from backend.app.tools.visualization.inputs import (
     parse_chart,
 )
 from backend.app.tools.visualization.load import (
+    observation_count,
     failed,
     prepare_numeric,
     read_dataset,
@@ -29,7 +30,11 @@ def run(
         return loaded
     table = _table(loaded, spec)
     return save_chart(
-        spec, len(loaded), output_dir, lambda ax: table.plot(kind="bar", ax=ax)
+        spec,
+        observation_count(kwargs, len(loaded)),
+        output_dir,
+        lambda ax: table.plot(kind="bar", ax=ax),
+        input_row_count=len(loaded),
     )
 
 

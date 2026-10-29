@@ -65,6 +65,7 @@ class ToolRegistry:
                 "name": t.name,
                 "description": t.description,
                 "phase": t.phase,
+                "accepted_dtypes": sorted(t.accepted_dtypes),
                 "schema": t.input_model.model_json_schema(),
             }
             for t in self._tools.values()

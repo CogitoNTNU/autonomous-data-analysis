@@ -192,6 +192,16 @@ def _add_calculated_result(
     if not isinstance(result.values, dict):
         raise ValueError("Analysis evidence requires inline values")
     evidence.results.append(ResultEvidence.model_validate(result.model_dump()))
+    if result.method == "group_aggregate":
+        group_count = result.values.get("group_count")
+        if (
+            isinstance(group_count, int)
+            and not isinstance(group_count, bool)
+            and group_count > 0
+        ):
+            evidence.required_limitations.append(
+                f"Comparisons are limited to the {group_count} observed groups in this dataset."
+            )
     if result.values.get("status") == "partial":
         evidence.required_limitations.append(
             f"Result '{result.result_id}' is partial; "

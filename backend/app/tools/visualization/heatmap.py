@@ -19,6 +19,7 @@ from backend.app.tools.visualization.inputs import (
     parse_chart,
 )
 from backend.app.tools.visualization.load import (
+    observation_count,
     failed,
     read_dataset,
     runtime_source_rows,
@@ -34,7 +35,13 @@ def run(
         return failed("INSUFFICIENT_DATA", "no rows")
     # antall rader i hvert x/y-par, ikke en tredje verdikolonne
     counts = pd.crosstab(frame[spec.x], frame[spec.y])
-    return save_chart(spec, len(frame), output_dir, lambda ax: _draw(ax, counts))
+    return save_chart(
+        spec,
+        observation_count(kwargs, len(frame)),
+        output_dir,
+        lambda ax: _draw(ax, counts),
+        input_row_count=len(frame),
+    )
 
 
 def _draw(ax: Axes, counts: pd.DataFrame) -> None:

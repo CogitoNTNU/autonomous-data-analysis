@@ -12,7 +12,11 @@ from backend.app.tools.visualization.inputs import (
     YNumericAxesInput,
     parse_chart,
 )
-from backend.app.tools.visualization.load import prepare_numeric, runtime_source_rows
+from backend.app.tools.visualization.load import (
+    observation_count,
+    prepare_numeric,
+    runtime_source_rows,
+)
 
 
 def run(
@@ -23,7 +27,13 @@ def run(
     if isinstance(loaded, dict):
         return loaded
     table = _table(loaded, spec)
-    return save_chart(spec, len(loaded), output_dir, lambda ax: table.plot(ax=ax))
+    return save_chart(
+        spec,
+        observation_count(kwargs, len(loaded)),
+        output_dir,
+        lambda ax: table.plot(ax=ax),
+        input_row_count=len(loaded),
+    )
 
 
 def _table(frame: pd.DataFrame, spec: YNumericAxesInput) -> pd.Series | pd.DataFrame:

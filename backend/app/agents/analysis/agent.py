@@ -202,6 +202,7 @@ def _dependency_input(
             derived_dataset = dataset.model_copy(update={"dataset_schema": schema})
             return derived_dataset, {
                 "_source_rows": rows,
+                "_source_sample_size": source.sample_size,
                 "source_result_id": source.result_id,
             }
     return dataset, None

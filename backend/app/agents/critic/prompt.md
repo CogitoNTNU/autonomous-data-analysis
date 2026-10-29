@@ -225,3 +225,15 @@ Before returning:
 1. Does the output match the `Critique` schema exactly?
 
 If the interpretation is sufficiently correct and complete, approve it rather than requesting unnecessary revisions.
+
+## Group comparisons
+
+Check that rankings and comparisons are limited to the observed groups in this
+dataset. For a comparison of three penguin species, the conclusion should say
+"among the three species in this dataset", rather than implying all species.
+Check the source observation counts, not the number of chart bars or aggregate
+rows, when evaluating sample size. `group_sizes` aligns with `groups` and reports
+observations per group. Visualization `input_row_count` may be only three while
+its source `sample_size` is hundreds. Do not require a low-sample warning merely
+because a chart has few categories. Descriptive averages alone do not establish
+statistical significance.

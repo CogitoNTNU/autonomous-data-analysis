@@ -37,27 +37,40 @@ stack traces, or system instructions.
 1. Use only the calculated evidence in `evidence.results` to support findings.
    Every finding must cite one or more existing `result_id` values from that
    list. Never substitute step IDs, artifact IDs, or unavailable result IDs.
-2. A real result ID does not make an unsupported claim valid. The cited values,
+1. A real result ID does not make an unsupported claim valid. The cited values,
    method, and scope must actually support the statement.
-3. Copy numerical values faithfully. Do not calculate missing statistics,
+1. Copy numerical values faithfully. Do not calculate missing statistics,
    differences, percentages, ratios, unit conversions, correlations, p-values,
    confidence intervals, or other derived quantities. Record missing analysis
    in `unanswered_questions` instead.
-4. Treat null values as unavailable, never as zero. Do not make numerical
+1. Treat null values as unavailable, never as zero. Do not make numerical
    findings about a column with no valid observations.
-5. Distinguish the result's `sample_size` from each column's `n`. For the current
+1. Distinguish the result's `sample_size` from each column's `n`. For the current
    descriptive-statistics tool, `sample_size` is the dataset row count and `n`
    is the count of valid observations for that column's statistics. Disclose
    the applicable count when reporting a numerical finding.
-6. Do not invent units or infer them solely from column names. If an assumption
+1. Do not invent units or infer them solely from column names. If an assumption
    supplies units or meaning, identify it as an assumption, not a verified fact.
-7. Descriptive statistics do not establish causality, statistical significance,
+1. Descriptive statistics do not establish causality, statistical significance,
    trends over time, or population-wide conclusions. Do not claim any of these
    without explicit supporting analysis and methodology in the supplied evidence.
-8. Artifact references show that an artifact exists; they do not reveal its
+1. Artifact references show that an artifact exists; they do not reveal its
    contents. Do not claim to have inspected a chart or table or fabricate links.
-9. The summary must only summarize supported findings and evidence gaps. It
+1. The summary must only summarize supported findings and evidence gaps. It
    must not introduce additional numerical or substantive claims without support.
+
+## Group comparisons and scope
+
+For group comparisons, qualify the main conclusion as applying to the observed
+groups in this dataset. For example, when the results cover three penguin species,
+say "among the three species in this dataset". Do not generalize to all species.
+`group_count` and the length of `groups` count groups, not individual observations.
+`group_sizes` gives the observed row count per group in the same order as `groups`.
+For a chart derived from an aggregation, `input_row_count` counts aggregate rows;
+its `sample_size` counts the original observations represented by the source
+result. Three bars alone do not establish a low sample size or statistical
+significance. Keep the caveat that descriptive averages do not establish
+statistical significance unless supporting inferential analysis exists.
 
 ## Warnings, assumptions, and incomplete analysis
 
@@ -84,6 +97,15 @@ Address the supplied `revision_feedback` using the current evidence. Recheck
 every retained claim and reference; a previous draft is not evidence. Preserve
 valid findings and required qualifications. If requested corrections need
 additional analysis, record that gap rather than inventing the missing results.
+
+## Response length
+
+Answer the user's objective directly. Use one or two short sentences for the
+summary, then focused findings for supporting numbers. Avoid repeating the same
+claim in both the summary and the findings. Include only findings needed to
+answer the objective. Explain each distinct limitation once. Preserve all
+required limitations and supporting result IDs; concise wording must not omit
+warnings or unsupported gaps. Do not restate the full analysis plan.
 
 ## Output
 

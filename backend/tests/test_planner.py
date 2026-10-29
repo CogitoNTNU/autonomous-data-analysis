@@ -213,3 +213,39 @@ def test_planner_accepts_date_axis_with_numeric_measure():
     )
 
     assert response.status == "success"
+
+
+def test_planner_accepts_species_counts_alongside_numeric_size_comparisons():
+    plan = make_valid_plan()
+    plan.analysis_steps[0].arguments["aggregations"].append(
+        {"column": "species", "function": "count", "alias": "sample_size"}
+    )
+    response = run_planner(
+        user_query="Which penguins are the largest?",
+        dataset=make_dataset(),
+        conversation_context=[],
+        critique=None,
+        registry=make_registry(),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "success"
+    assert response.updates.plan == plan
+
+
+def test_planner_receives_the_tools_datatype_requirements():
+    from unittest.mock import Mock
+
+    model = Mock(return_value=PlannerOutput(plan=make_valid_plan()))
+    run_planner(
+        user_query="Compare size",
+        dataset=make_dataset(),
+        conversation_context=[],
+        critique=None,
+        registry=make_registry(),
+        model=model,
+    )
+
+    definition = model.call_args.args[1].available_tools[0]
+    assert definition["accepted_dtypes"] == ["float", "integer"]
+    assert "count accepts any column datatype" in definition["description"]

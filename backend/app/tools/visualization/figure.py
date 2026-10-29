@@ -25,12 +25,15 @@ def save_chart(
     sample_size: int,
     output_dir: Path | None,
     draw: Callable[[Axes], None],
+    *,
+    input_row_count: int,
 ) -> dict[str, object]:
     # png-en lagres utenfor state, bare referansen sendes videre
     directory = output_dir if output_dir is not None else _default_directory()
     artifact = _write_png(draw, spec, directory)
     result = VisualizationResult(
         sample_size=sample_size,
+        input_row_count=input_row_count,
         source_result_ids=_sources(spec),
         artifacts=[artifact],
         warnings=_warnings(sample_size),
