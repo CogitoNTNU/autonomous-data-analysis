@@ -234,7 +234,10 @@ def _real_models(
         )
     )
     interpretation = InterpretationLLM(
-        client, settings.model_name, timeout_seconds=settings.timeout_seconds
+        client,
+        settings.model_name,
+        timeout_seconds=settings.timeout_seconds,
+        completion=settings.completion,
     )
     return planner, interpretation, critic
 

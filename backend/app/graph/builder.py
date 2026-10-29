@@ -14,6 +14,7 @@ from backend.app.tools.registry import ToolRegistry
 
 from .interaction import chat_graph_node, clarify
 from .lifecycle import finish_run, start_run
+from .observability import measured_node
 from .nodes import (
     analysis_graph_node,
     critic_graph_node,
@@ -50,20 +51,36 @@ def build_graph(
             lambda state: "finish_run" if state["last_node_error"] else "planner",
             {"finish_run": "finish_run", "planner": "planner"},
         )
-        builder.add_node("chat", chat_graph_node)
+        builder.add_node("chat", measured_node("chat", chat_graph_node))
         builder.add_edge("chat", "finish_run")
 
     builder.add_node("start_run", start_run)
     builder.add_node("finish_run", finish_run)
     builder.add_node(
-        "planner", partial(planner_graph_node, registry=registry, model=planner_model)
+        "planner",
+        measured_node(
+            "planner",
+            partial(planner_graph_node, registry=registry, model=planner_model),
+        ),
     )
-    builder.add_node("preprocessing", preprocessing_graph_node)
-    builder.add_node("analysis", partial(analysis_graph_node, registry=registry))
     builder.add_node(
-        "interpretation", partial(interpretation_graph_node, model=interpretation_model)
+        "preprocessing", measured_node("preprocessing", preprocessing_graph_node)
     )
-    builder.add_node("critic", partial(critic_graph_node, model=critic_model))
+    builder.add_node(
+        "analysis",
+        measured_node("analysis", partial(analysis_graph_node, registry=registry)),
+    )
+    builder.add_node(
+        "interpretation",
+        measured_node(
+            "interpretation",
+            partial(interpretation_graph_node, model=interpretation_model),
+        ),
+    )
+    builder.add_node(
+        "critic",
+        measured_node("critic", partial(critic_graph_node, model=critic_model)),
+    )
     builder.add_edge(START, "start_run")
     builder.add_edge("start_run", "planner")
     builder.add_conditional_edges(

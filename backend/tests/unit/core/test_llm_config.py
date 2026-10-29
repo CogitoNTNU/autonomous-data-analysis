@@ -62,3 +62,59 @@ def test_rejects_invalid_settings_without_exposing_values(name, value):
     assert "private-key" not in str(error.value)
     assert "password" not in str(error.value)
     assert "key=secret" not in str(error.value)
+
+
+def test_glm_53_uses_low_effort_and_a_bounded_completion_by_default():
+    settings = load_llm_settings(
+        {
+            "NTNU_LLM_API_KEY": "test-key",
+            "NTNU_LLM_MODEL": "Inferact/GLM-5.3-NVFP4",
+        }
+    )
+    assert settings.completion.request_kwargs() == {
+        "max_tokens": 4096,
+        "reasoning_effort": "low",
+    }
+
+
+def test_unknown_model_does_not_receive_an_assumed_reasoning_parameter():
+    settings = load_llm_settings(
+        {"NTNU_LLM_API_KEY": "test-key", "NTNU_LLM_MODEL": "custom-model"}
+    )
+    assert settings.completion.request_kwargs() == {"max_tokens": 4096}
+
+
+def test_explicit_generation_budget_and_effort_are_preserved():
+    settings = load_llm_settings(
+        {
+            "NTNU_LLM_API_KEY": "test-key",
+            "NTNU_LLM_MODEL": "Inferact/GLM-5.3-NVFP4",
+            "NTNU_LLM_MAX_TOKENS": "2048",
+            "NTNU_LLM_REASONING_EFFORT": "high",
+        }
+    )
+    assert settings.completion.request_kwargs() == {
+        "max_tokens": 2048,
+        "reasoning_effort": "high",
+    }
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("NTNU_LLM_MAX_TOKENS", "0"),
+        ("NTNU_LLM_MAX_TOKENS", "50000"),
+        ("NTNU_LLM_MAX_TOKENS", "invalid"),
+        ("NTNU_LLM_REASONING_EFFORT", "invalid"),
+        ("NTNU_LLM_REASONING_EFFORT", "medium"),
+    ],
+)
+def test_rejects_invalid_glm_generation_settings(name, value):
+    with pytest.raises(ValueError):
+        load_llm_settings(
+            {
+                "NTNU_LLM_API_KEY": "test-key",
+                "NTNU_LLM_MODEL": "Inferact/GLM-5.3-NVFP4",
+                name: value,
+            }
+        )

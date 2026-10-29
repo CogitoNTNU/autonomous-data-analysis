@@ -92,7 +92,10 @@ def main(argv: list[str] | None = None) -> int:
             client.max_retries = 0
             client.timeout = settings.timeout_seconds
             interpretation = InterpretationLLM(
-                client, settings.model_name, timeout_seconds=settings.timeout_seconds
+                client,
+                settings.model_name,
+                timeout_seconds=settings.timeout_seconds,
+                completion=settings.completion,
             )
             graph = build_graph(
                 registry,

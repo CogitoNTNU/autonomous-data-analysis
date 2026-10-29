@@ -27,9 +27,10 @@ def critic_provider(monkeypatch: pytest.MonkeyPatch) -> tuple[CriticLLM, Mock]:
         return_value=SimpleNamespace(
             choices=[
                 SimpleNamespace(
+                    finish_reason="stop",
                     message=SimpleNamespace(
                         content=Critique(decision="approved").model_dump_json()
-                    )
+                    ),
                 )
             ]
         )

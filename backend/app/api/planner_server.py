@@ -17,6 +17,7 @@ from backend.app.api.origins import Headers, require_site_origin
 from backend.app.api.redact import redact
 from backend.app.api.workflows import ROUTES, dispatch_workflow
 from backend.app.contracts.models import ConversationMessage
+from backend.app.core.logging import configure_workflow_logging
 from backend.app.services.analysis_request import analyze_plan
 from backend.app.services.chat_request import present_answer
 from backend.app.services.critic_request import (
@@ -126,6 +127,7 @@ def serve(
 
 
 def main() -> None:
+    configure_workflow_logging()
     serve(directory=upload_directory()).serve_forever()
 
 

@@ -17,6 +17,7 @@ from backend.app.agents.planner.agent import PlannerContext
 from backend.app.agents.planner.context import context_message
 from backend.app.agents.planner.schema import PlannerOutput
 from backend.app.tools.registry import ToolRegistry, registered_tool
+from backend.app.core.llm_config import load_llm_settings
 
 MAX_TOOL_ROUNDS = 5
 
@@ -27,11 +28,13 @@ class PlannerLLM:
         inspection_registry: ToolRegistry,
     ) -> None:
         self.inspection_registry = inspection_registry
-        self.model = os.environ["NTNU_LLM_MODEL"]
+        self.settings = load_llm_settings(os.environ)
+        self.model = self.settings.model_name
         self.client = OpenAI(
-            base_url=os.environ["NTNU_LLM_BASE_URL"],
-            api_key=os.environ["NTNU_LLM_API_KEY"],
+            base_url=str(self.settings.base_url),
+            api_key=self.settings.api_key.get_secret_value(),
             max_retries=0,
+            timeout=self.settings.timeout_seconds,
         )
 
     def __call__(
@@ -62,6 +65,7 @@ class PlannerLLM:
                     model=self.model,
                     messages=messages,
                     tools=tools,
+                    **self.settings.completion.request_kwargs(),
                 )
             except APITimeoutError as error:
                 raise TimeoutError("The Planner model timed out.") from error
@@ -72,7 +76,10 @@ class PlannerLLM:
                     "The Planner provider returned an invalid response."
                 ) from error
 
-            message = response.choices[0].message
+            choice = response.choices[0]
+            if choice.finish_reason in {"length", "content_filter"}:
+                raise ValueError("The Planner response did not finish normally.")
+            message = choice.message
 
             if not message.tool_calls:
                 if message.content is None:
@@ -145,3 +152,6 @@ class PlannerLLM:
             }
             for tool in self.inspection_registry.list_tools()
         ]
+
+    def close(self) -> None:
+        self.client.close()

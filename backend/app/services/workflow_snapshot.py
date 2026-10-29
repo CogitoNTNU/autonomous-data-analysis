@@ -56,7 +56,7 @@ def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnap
     elif snapshot.interrupts and question and not running:
         status = "needs_clarification"
         active = "planner"
-    elif state["control"].status == "completed":
+    elif state["control"].status == "completed" and not running:
         status = "completed"
     elif not running:
         status = "error"
@@ -90,6 +90,13 @@ def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnap
         if error
         else None
     )
+    if error and error.code == "TIMEOUT":
+        public_error = error.model_copy(
+            update={
+                "details": {},
+                "message": f"The model service did not respond in time during {error.source}. Please try again.",
+            }
+        )
     if error and error.source == "harness":
         public_error = error.model_copy(update={"details": {}})
     return WorkflowSnapshot(

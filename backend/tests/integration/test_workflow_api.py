@@ -226,3 +226,36 @@ def test_start_cannot_replace_a_registered_dataset(workflow_app, pipeline_datase
     )
     assert code == 422
     assert Path(stored).read_bytes() == original
+
+
+def test_completed_state_is_not_terminal_until_worker_releases_the_run(
+    workflow_app,
+    pipeline_dataset,
+):
+    from uuid import UUID
+
+    result = settled(workflow_app, start(workflow_app, pipeline_dataset)["run_id"])
+    with workflow_app.workflows.store.acquire(result["run_id"]):
+        active = workflow_app.workflows.status(UUID(result["run_id"]))
+        assert active.status == "running"
+    final = workflow_app.workflows.status(UUID(result["run_id"]))
+    assert final.status == "completed"
+    assert final.checkpoint_id == result["checkpoint_id"]
+
+
+def test_interpretation_timeouts_retry_once_reuse_client_and_then_stop(
+    workflow_app, pipeline_dataset, pipeline_models
+):
+    model = Mock(side_effect=TimeoutError("private provider timeout"))
+    factory = Mock(return_value=model)
+    workflow_app.workflows.interpretation = factory
+    result = settled(workflow_app, start(workflow_app, pipeline_dataset)["run_id"])
+
+    assert result["status"] == "error"
+    assert result["error"]["code"] == "TIMEOUT"
+    assert "did not respond in time" in result["error"]["message"]
+    assert model.call_count == 2
+    factory.assert_called_once()
+    model.close.assert_called_once()
+    assert pipeline_models[0].call_count == 1
+    pipeline_models[2].assert_not_called()

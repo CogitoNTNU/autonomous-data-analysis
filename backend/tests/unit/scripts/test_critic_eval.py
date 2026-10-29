@@ -91,9 +91,10 @@ def test_provider_payload_has_warnings_without_evaluation_labels(monkeypatch) ->
         return SimpleNamespace(
             choices=[
                 SimpleNamespace(
+                    finish_reason="stop",
                     message=SimpleNamespace(
                         content=Critique(decision="approved").model_dump_json()
-                    )
+                    ),
                 )
             ]
         )

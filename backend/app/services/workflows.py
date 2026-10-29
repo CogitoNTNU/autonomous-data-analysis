@@ -3,8 +3,9 @@
 import logging
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
-from typing import IO
+from contextlib import ExitStack, contextmanager
+from functools import cache
+from typing import IO, TypeVar
 from uuid import UUID
 
 from langchain_core.runnables import RunnableConfig
@@ -41,20 +42,23 @@ class WorkflowService:
 
     @contextmanager
     def graph(self) -> Iterator[CompiledStateGraph]:
-        with self.store.open() as saver:
+        with self.store.open() as saver, ExitStack() as resources:
+            planner = _lazy_model(self.planner, resources)
+            interpretation = _lazy_model(self.interpretation, resources)
+            critic = _lazy_model(self.critic, resources)
             yield build_graph(
                 self.registry,
-                lambda prompt, context: self.planner()(prompt, context),
-                interpretation_model=lambda prompt, context: self.interpretation()(
+                lambda prompt, context: planner()(prompt, context),
+                interpretation_model=lambda prompt, context: interpretation()(
                     prompt, context
                 ),
-                critic_model=lambda prompt, context: self.critic()(prompt, context),
+                critic_model=lambda prompt, context: critic()(prompt, context),
                 checkpointer=saver,
                 conversational=True,
             )
 
     def start(self, dataset: DatasetReference, question: str) -> WorkflowSnapshot:
-        state = create_initial_state(question, dataset)
+        state = create_initial_state(question, dataset, max_retries=1)
         run_id = state["run_id"]
         lease = self.store.acquire(run_id)
         try:
@@ -136,3 +140,22 @@ class WorkflowService:
 
 def _config(run_id: str) -> RunnableConfig:
     return {"configurable": {"thread_id": run_id}}
+
+
+ModelT = TypeVar("ModelT")
+
+
+def _lazy_model(
+    factory: Callable[[], ModelT], resources: ExitStack
+) -> Callable[[], ModelT]:
+    """Reuse each provider connection within a run; status reads create no clients."""
+
+    @cache
+    def load() -> ModelT:
+        model = factory()
+        close = getattr(model, "close", None)
+        if callable(close):
+            resources.callback(close)
+        return model
+
+    return load

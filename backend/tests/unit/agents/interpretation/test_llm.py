@@ -229,3 +229,26 @@ def test_rejects_empty_prompt_before_provider_call(client_factory, context):
 
     with pytest.raises(ValueError, match="prompt"):
         InterpretationLLM(client, "test-model")(" ", context)
+
+
+def test_limits_reasoning_and_completion_without_dropping_evidence(
+    client_factory, completion, context
+):
+    from backend.app.core.llm_config import CompletionOptions
+
+    sent = []
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx2.Response(200, json=completion)
+
+    model = InterpretationLLM(
+        client_factory(handler),
+        "Inferact/GLM-5.3-NVFP4",
+        completion=CompletionOptions(max_tokens=2048, reasoning_effort="low"),
+    )
+    model("Interpret.", context)
+
+    assert sent[0]["max_tokens"] == 2048
+    assert sent[0]["reasoning_effort"] == "low"
+    assert json.loads(sent[0]["messages"][1]["content"]) == context.model_dump()

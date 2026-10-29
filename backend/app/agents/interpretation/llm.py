@@ -16,11 +16,12 @@ from pydantic import ValidationError
 
 from backend.app.contracts.models import Interpretation
 from backend.app.core.exceptions import ModelProviderError
+from backend.app.core.llm_config import CompletionOptions, IDUN_TIMEOUT_SECONDS
 
 from .context import serialize_context
 from .schema import InterpretationContext
 
-DEFAULT_TIMEOUT_SECONDS = 30.0
+DEFAULT_TIMEOUT_SECONDS = IDUN_TIMEOUT_SECONDS
 
 
 class InterpretationLLM:
@@ -37,6 +38,7 @@ class InterpretationLLM:
         model_name: str,
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        completion: CompletionOptions | None = None,
     ) -> None:
         if not model_name.strip():
             raise ValueError("A model name is required")
@@ -44,6 +46,7 @@ class InterpretationLLM:
             raise ValueError("Model timeout must be finite and positive")
         self._client = client.with_options(max_retries=0, timeout=timeout_seconds)
         self._model_name = model_name
+        self._completion = completion or CompletionOptions()
 
     def __call__(
         self,
@@ -66,6 +69,7 @@ class InterpretationLLM:
                     {"role": "user", "content": content},
                 ],
                 response_format={"type": "json_object"},
+                **self._completion.request_kwargs(),
             )
         except APITimeoutError as error:
             raise TimeoutError("The interpretation model timed out") from error
@@ -78,6 +82,9 @@ class InterpretationLLM:
         except APIResponseValidationError as error:
             raise ValueError("The provider returned an invalid response") from error
         return _parse_completion(completion)
+
+    def close(self) -> None:
+        self._client.close()
 
     @staticmethod
     def parse_output(content: str) -> Interpretation:

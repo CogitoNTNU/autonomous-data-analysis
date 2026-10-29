@@ -74,7 +74,10 @@ def check_connection(settings: LLMSettings) -> int:
             timeout=settings.timeout_seconds,
         ) as client:
             model = InterpretationLLM(
-                client, settings.model_name, timeout_seconds=settings.timeout_seconds
+                client,
+                settings.model_name,
+                timeout_seconds=settings.timeout_seconds,
+                completion=settings.completion,
             )
             response = run_interpretation(sample_request(), model)
     except OpenAIError:

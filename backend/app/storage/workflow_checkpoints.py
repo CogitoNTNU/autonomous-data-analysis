@@ -1,12 +1,57 @@
 """Local durable checkpoints and per-run leases for the backend server."""
 
 import fcntl
+import sqlite3
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import IO
 
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+
+from backend.app.contracts.errors import AgentError
+from backend.app.contracts.final_response import FinalResponse
+from backend.app.contracts.models import (
+    AnalysisExecutionReport,
+    AnalysisResult,
+    Artifact,
+    ConversationMessage,
+    Critique,
+    CritiqueIssue,
+    DatasetReference,
+    Finding,
+    Interpretation,
+    Plan,
+    PlanStep,
+    PreprocessingReport,
+    ResultReference,
+    RevisionRecord,
+    RunControl,
+    WarningEvent,
+)
+
+# Only persisted workflow contracts may be reconstructed from checkpoints.
+CHECKPOINT_TYPES = (
+    DatasetReference,
+    RunControl,
+    AgentError,
+    ConversationMessage,
+    Plan,
+    PlanStep,
+    PreprocessingReport,
+    AnalysisExecutionReport,
+    AnalysisResult,
+    ResultReference,
+    Artifact,
+    WarningEvent,
+    Interpretation,
+    Finding,
+    Critique,
+    CritiqueIssue,
+    RevisionRecord,
+    FinalResponse,
+)
 
 
 class WorkflowCheckpoints:
@@ -16,9 +61,18 @@ class WorkflowCheckpoints:
     @contextmanager
     def open(self) -> Iterator[SqliteSaver]:
         self.directory.mkdir(parents=True, exist_ok=True)
-        with SqliteSaver.from_conn_string(
-            str(self.directory / "checkpoints.sqlite")
-        ) as saver:
+        serializer = JsonPlusSerializer(
+            allowed_msgpack_modules=[
+                (model.__module__, model.__name__) for model in CHECKPOINT_TYPES
+            ],
+        )
+        with closing(
+            sqlite3.connect(
+                str(self.directory / "checkpoints.sqlite"),
+                check_same_thread=False,
+            )
+        ) as connection:
+            saver = SqliteSaver(connection, serde=serializer)
             saver.setup()
             yield saver
 

@@ -5,7 +5,8 @@ from backend.app.agents.interpretation.node import interpretation_node
 from backend.app.agents.interpretation.schema import InterpretationModel
 from backend.app.contracts.models import Artifact, DatasetReference
 from backend.app.contracts.state import create_initial_state
-from backend.app.services.llm_env import ntnu_client
+from backend.app.services.llm_env import ntnu_client, ensure_llm_environment
+from backend.app.core.llm_config import load_llm_settings
 from backend.app.services.plan_payload import load_plan, load_results
 from backend.app.services.preprocessing_request import prepare_dataset
 
@@ -13,7 +14,14 @@ from backend.app.services.preprocessing_request import prepare_dataset
 def live_interpretation_model() -> InterpretationLLM:
     from os import environ
 
-    return InterpretationLLM(ntnu_client(), environ["NTNU_LLM_MODEL"])
+    ensure_llm_environment()
+    settings = load_llm_settings(environ)
+    return InterpretationLLM(
+        ntnu_client(),
+        settings.model_name,
+        timeout_seconds=settings.timeout_seconds,
+        completion=settings.completion,
+    )
 
 
 def interpret_results(

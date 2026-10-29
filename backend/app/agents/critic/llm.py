@@ -12,18 +12,21 @@ from openai import (
 
 from backend.app.agents.critic.agent import CriticContext
 from backend.app.contracts.models import Critique
+from backend.app.core.llm_config import load_llm_settings
 
 from .context import serialize_context
 
 
 class CriticLLM:
     def __init__(self) -> None:
-        self.model = os.environ["NTNU_LLM_MODEL"]
+        self.settings = load_llm_settings(os.environ)
+        self.model = self.settings.model_name
 
         self.client = OpenAI(
-            base_url=os.environ["NTNU_LLM_BASE_URL"],
-            api_key=os.environ["NTNU_LLM_API_KEY"],
+            base_url=str(self.settings.base_url),
+            api_key=self.settings.api_key.get_secret_value(),
             max_retries=0,
+            timeout=self.settings.timeout_seconds,
         )
 
     def __call__(
@@ -48,6 +51,7 @@ class CriticLLM:
                         "content": serialize_context(context),
                     },
                 ],
+                **self.settings.completion.request_kwargs(),
             )
         except APITimeoutError as error:
             raise TimeoutError("The Critic model timed out.") from error
@@ -58,7 +62,10 @@ class CriticLLM:
                 "The Critic provider returned an invalid response."
             ) from error
 
-        content = response.choices[0].message.content
+        choice = response.choices[0]
+        if choice.finish_reason != "stop":
+            raise ValueError("The Critic response did not finish normally.")
+        content = choice.message.content
 
         if not content:
             raise ValueError("Critic returned no output")
@@ -69,3 +76,6 @@ class CriticLLM:
             content = "\n".join(content.splitlines()[1:-1]).strip()
 
         return Critique.model_validate_json(content)
+
+    def close(self) -> None:
+        self.client.close()
