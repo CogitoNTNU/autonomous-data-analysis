@@ -69,9 +69,18 @@ export type AnalysisFigure = {
   image: string;
 };
 
+export type AnalysisTable = {
+  id: string;
+  columns: string[];
+  rows: (string | number | boolean | null)[][];
+  groupSizes?: number[];
+  sampleSize: number;
+};
+
 export type AnalysisReport = {
   steps: AnalysisStepView[];
   figures: AnalysisFigure[];
+  tables?: AnalysisTable[];
   warnings: string[];
   results: Record<string, unknown>[];
   artifacts: { artifact_id: string; type: string }[];

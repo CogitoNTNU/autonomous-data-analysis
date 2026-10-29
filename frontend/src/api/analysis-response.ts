@@ -1,3 +1,4 @@
+import { groupedTables } from "@/api/analysis-tables";
 import { count } from "@/api/payload/count";
 import { errorStatus } from "@/api/payload/error-status";
 import { isRecord } from "@/api/payload/is-record";
@@ -25,6 +26,7 @@ function toAnalysis(value: unknown): AnalysisReport {
   return {
     steps: results.map(toStep),
     figures: figures(value.figures),
+    tables: groupedTables(results),
     warnings: warningMessages(value.warnings),
     results,
     artifacts: artifacts(value.artifacts),
