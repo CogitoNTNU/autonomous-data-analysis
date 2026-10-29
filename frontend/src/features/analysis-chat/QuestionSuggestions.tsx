@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import type { DatasetPreview } from "@/types/dataset";
 
 type QuestionSuggestionsProps = {
@@ -33,19 +34,20 @@ export function QuestionSuggestions({
 }: QuestionSuggestionsProps) {
   return (
     <section aria-label="Suggested questions" className="mb-3">
-      <p className="px-1 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <p className="px-1 text-sm font-medium leading-5 text-muted-foreground">
         Try asking
       </p>
       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
         {suggestedQuestions(dataset.columns).map((question) => (
-          <button
-            className="rounded-xl border border-border bg-background px-3 py-3 text-left text-base leading-7 text-muted-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <Button
+            variant="outline"
+            className="h-auto min-h-20 items-start justify-start whitespace-normal rounded-xl px-3 py-3 text-left text-base font-normal leading-7 text-foreground shadow-sm hover:bg-muted"
             key={question}
             onClick={() => onSelect(question)}
             type="button"
           >
             {question}
-          </button>
+          </Button>
         ))}
       </div>
     </section>

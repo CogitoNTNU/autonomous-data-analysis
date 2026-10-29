@@ -9,14 +9,14 @@ type AgentMarkProps = {
 export function AgentMark({
   compact = false,
   className,
-  initials = "DA",
+  initials = "DAP",
 }: AgentMarkProps) {
   return (
     <div
       aria-hidden="true"
       className={cn(
         "grid shrink-0 place-items-center rounded-full bg-foreground font-semibold text-background",
-        compact ? "size-7 text-[10px]" : "size-8 text-xs",
+        compact ? "size-7 text-[10px]" : "size-9 text-xs",
         className,
       )}
     >

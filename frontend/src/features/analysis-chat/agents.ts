@@ -4,6 +4,7 @@ export type AgentIdentity = {
 };
 
 export const agents = {
+  assistant: { name: "Data Analysis Planner", initials: "DAP" },
   planner: { name: "Planner", initials: "PL" },
   preprocessing: { name: "Preprocessing", initials: "PR" },
   analysis: { name: "Analysis", initials: "AN" },

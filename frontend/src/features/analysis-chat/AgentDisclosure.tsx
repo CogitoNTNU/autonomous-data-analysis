@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,24 +27,26 @@ export function AgentDisclosure({
   statusBadge,
 }: AgentDisclosureProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const detailsId = `${agent.initials.toLowerCase()}-details`;
+  const detailsId = useId();
 
   return (
     <section>
-      <AgentTurn agent={agent}>
+      <AgentTurn agent={agent} compact>
         <Button
           variant="ghost"
+          aria-label={summary}
           aria-controls={detailsId}
           aria-expanded={open}
-          className="flex h-auto w-full items-center gap-2 rounded-md px-0 py-1 text-left text-base font-medium hover:bg-transparent hover:text-muted-foreground"
+          className="flex h-auto w-full items-center gap-3 whitespace-normal rounded-md px-0 py-1 text-left text-base font-medium leading-7 hover:bg-transparent hover:text-muted-foreground"
           onClick={() => setOpen((current) => !current)}
           type="button"
         >
           <span className="min-w-0 flex-1">{summary}</span>
           {statusBadge}
           <ChevronRight
+            aria-hidden="true"
             className={cn(
-              "size-3.5 shrink-0 text-muted-foreground transition-transform",
+              "size-4 shrink-0 text-muted-foreground transition-transform",
               open && "rotate-90",
             )}
           />
@@ -54,7 +56,7 @@ export function AgentDisclosure({
             {detailsTitle ? (
               <Card className="overflow-hidden shadow-none">
                 <CardHeader className="border-b p-4">
-                  <CardTitle className="text-lg">{detailsTitle}</CardTitle>
+                  <CardTitle className="text-xl font-semibold leading-7 tracking-tight">{detailsTitle}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">{children}</CardContent>
               </Card>

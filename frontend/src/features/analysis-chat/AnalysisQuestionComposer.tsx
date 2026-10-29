@@ -50,7 +50,7 @@ export function AnalysisQuestionComposer({
         <div className="flex min-h-20 items-center gap-2 rounded-3xl border border-border bg-composer p-2 shadow-sm transition-colors focus-within:border-ring">
           <Textarea
             aria-label="Analysis question"
-            className="max-h-32 min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-base leading-7 shadow-none focus-visible:ring-0"
+            className="max-h-32 min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-base font-normal leading-7 shadow-none focus-visible:ring-0 md:text-base"
             disabled={!hasDataset || disabled}
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={handleKeyDown}
@@ -76,9 +76,6 @@ export function AnalysisQuestionComposer({
               <ArrowUp className="size-4" />
             </Button>
         </div>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
-          Review the plan before running any analysis.
-        </p>
       </form>
     </div>
   );

@@ -7,7 +7,6 @@ import { ClarificationPrompt } from "@/features/analysis-chat/ClarificationPromp
 import { QuestionSuggestions } from "@/features/analysis-chat/QuestionSuggestions";
 import { WorkflowTurns } from "@/features/analysis-chat/WorkflowTurns";
 import { SubmittedQuestion } from "@/features/analysis-chat/SubmittedQuestion";
-import { ThinkingIndicator } from "@/features/analysis-chat/ThinkingIndicator";
 import { usePlannerSession } from "@/features/analysis-chat/usePlannerSession";
 import type { WorkflowClient } from "@/api/workflows";
 import { DatasetPreviewPanel } from "@/features/dataset-preview/DatasetPreviewPanel";
@@ -35,9 +34,7 @@ export function App({ planner }: AppProps) {
         aria-hidden={!sidebarOpen}
       >
       <AppSidebar
-        dataset={session.dataset}
         onNewAnalysis={session.resetQuestion}
-        onReplaceDataset={session.replaceDataset}
         onClose={() => setSidebarOpen(false)}
       />
       </div>
@@ -112,8 +109,7 @@ function DatasetConversation({
           {session.clarificationAnswer && (
             <SubmittedQuestion question={session.clarificationAnswer} onEdit={editQuestion} editDisabled={editingDisabled} />
           )}
-          {session.phase === "thinking" && <ThinkingIndicator />}
-          {session.plan && <WorkflowTurns session={session} />}
+          <WorkflowTurns session={session} />
           {(session.phase === "clarification" ||
             session.phase === "clarification_input") &&
             session.clarification && (
@@ -123,9 +119,7 @@ function DatasetConversation({
                 onSelect={session.answerClarification}
               />
             )}
-          {session.phase === "error" && session.error && !session.plan && (
-            <PlannerError agent={agents.planner} message={session.error} />
-          )}
+
         </>
       ) : null}
     </>

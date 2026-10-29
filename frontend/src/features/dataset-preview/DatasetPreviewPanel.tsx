@@ -1,5 +1,5 @@
 import { DatasetReplaceButton } from "@/features/dataset-preview/DatasetReplaceButton";
-import { FileSpreadsheet } from "lucide-react";
+import { Table2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -45,8 +45,8 @@ export function DatasetPreviewPanel({
 
           <Card className="mt-4 shadow-none">
             <CardHeader className="flex-row items-center gap-3 space-y-0 border-b p-4">
-              <div className="grid size-9 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
-                <FileSpreadsheet className="size-4" />
+              <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-border/60 bg-muted text-muted-foreground">
+                <Table2 aria-hidden="true" className="size-4" />
               </div>
               <div className="min-w-0 flex-1">
                 <CardTitle className="truncate text-base">

@@ -48,26 +48,23 @@ describe("App dataset preview flow", () => {
     );
     await user.upload(screen.getByLabelText("Choose CSV file"), file);
 
-    expect(
-      await screen.findByText(/It contains 2 rows and 3 columns/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/It contains 2 rows and 3 columns/)).toBeVisible();
+    expect(screen.getByRole("banner")).not.toHaveTextContent("penguins.csv");
+    expect(screen.queryByRole("button", { name: "Preview penguins.csv" })).toBeNull();
     expect(screen.getByRole("columnheader", { name: "species" })).toBeVisible();
     expect(screen.getByRole("cell", { name: "Gentoo" })).toBeVisible();
   });
 
-  it("returns to the upload screen when the dataset is replaced", async () => {
+  it("replaces the dataset directly from its preview", async () => {
     const user = userEvent.setup();
     render(<App planner={prototypePlanner} />);
-
-    const file = new File(["name,value\nAda,1"], "sample.csv", {
-      type: "text/csv",
-    });
-    await user.upload(screen.getByLabelText("Choose CSV file"), file);
-    await user.click(await screen.findByRole("button", { name: "Replace file" }));
-
-    expect(
-      screen.getByRole("heading", { name: "What are you analyzing?" }),
-    ).toBeVisible();
+    await user.upload(screen.getByLabelText("Choose CSV file"), new File(["name,value\nAda,1"], "sample.csv", { type: "text/csv" }));
+    expect(await screen.findByRole("columnheader", { name: "name" })).toBeVisible();
+    await user.upload(screen.getByLabelText("Replace CSV file"), new File(["city,amount\nOslo,2\nBergen,3"], "cities.csv", { type: "text/csv" }));
+    expect(await screen.findByRole("columnheader", { name: "city" })).toBeVisible();
+    expect(screen.getByRole("cell", { name: "Bergen" })).toBeVisible();
+    expect(screen.queryAllByText("sample.csv")).toHaveLength(0);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("submits a suggested analysis question after loading a dataset", async () => {
@@ -96,8 +93,9 @@ describe("App dataset preview flow", () => {
     expect(
       screen.getByText("What is the average body mass by species?", { selector: "p" }),
     ).toBeVisible();
-    expect(screen.getByRole("status", { name: "Thinking" })).toBeVisible();
+    expect(screen.getByRole("status", { name: "Analyzing data…" })).toBeVisible();
     expect(screen.getByLabelText("Analysis question")).toBeDisabled();
+    await user.click(await screen.findByRole("button", { name: "View analysis details" }));
     await user.click(
       await screen.findByRole("button", {
         name: "Prepared an analysis plan, 3 steps",
@@ -134,11 +132,9 @@ describe("App dataset preview flow", () => {
     await user.type(screen.getByLabelText("Analysis question"), "Body mass{Enter}");
 
     expect(screen.getByText("Body mass")).toBeVisible();
-    expect(screen.getByRole("status", { name: "Thinking" })).toBeVisible();
+    expect(screen.getByRole("status", { name: "Analyzing data…" })).toBeVisible();
     expect(
-      await screen.findByRole("button", {
-        name: "Prepared an analysis plan, 3 steps",
-      }),
+      await screen.findByRole("button", { name: "View analysis details" }),
     ).toBeVisible();
   });
   it("starts a new question without discarding the loaded dataset", async () => {
@@ -155,9 +151,7 @@ describe("App dataset preview flow", () => {
       }),
     );
     expect(
-      await screen.findByRole("button", {
-        name: "Prepared an analysis plan, 3 steps",
-      }),
+      await screen.findByRole("button", { name: "View analysis details" }),
     ).toBeVisible();
 
     await user.click(
@@ -190,15 +184,17 @@ describe("App dataset preview flow", () => {
       }),
     );
     expect(
-      await screen.findByRole("button", { name: "Prepared an analysis plan, 3 steps" }),
+      await screen.findByRole("button", { name: "View analysis details" }),
     ).toBeVisible();
     expect(screen.queryByText(/The uploaded CSV is the dataset/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Prepare dataset" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Show final answer" })).toBeNull();
 
     expect(
-      await screen.findByRole("button", { name: "Prepared an answer" }),
+      await screen.findByText("The prepared columns can be compared."),
     ).toBeVisible();
+    expect(screen.queryByText("Preprocessing finished, 2 rows to 2")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "View analysis details" }));
     expect(screen.getByText("Preprocessing finished, 2 rows to 2")).toBeVisible();
     expect(screen.getByText("Analysis finished, 1 result")).toBeVisible();
     expect(screen.getByText("Interpretation finished")).toBeVisible();

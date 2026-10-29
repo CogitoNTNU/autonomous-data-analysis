@@ -1,7 +1,7 @@
 import { useRef, useState, type DragEvent } from "react";
 import {
   CheckCircle2,
-  FileSpreadsheet,
+  Table2,
   LoaderCircle,
   Upload,
 } from "lucide-react";
@@ -66,7 +66,7 @@ export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
   return (
     <section aria-labelledby="upload-title" className="pt-12 sm:pt-16">
       <div className="grid size-8 place-items-center rounded-full bg-foreground text-[11px] font-semibold text-background">
-        DA
+        DAP
       </div>
       <h1
         className="mt-5 text-2xl font-semibold tracking-[-0.03em] sm:text-[26px]"
@@ -123,7 +123,7 @@ export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
             <p className="mt-3 text-base font-medium">CSV selected</p>
             <Card className="mx-auto mt-3 max-w-sm text-left shadow-none">
               <CardContent className="flex items-center gap-2 p-3">
-                <FileSpreadsheet className="size-4 shrink-0 text-emerald-700" />
+                <Table2 aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-base font-medium">
                   {selectedFile.name}
                 </span>

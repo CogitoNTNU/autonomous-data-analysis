@@ -7,57 +7,38 @@ import { CriticCard } from "@/features/analysis-chat/CriticCard";
 import { InterpretationCard } from "@/features/analysis-chat/InterpretationCard";
 import { PreprocessingReportCard } from "@/features/analysis-chat/PreprocessingReportCard";
 import { ThinkingIndicator } from "@/features/analysis-chat/ThinkingIndicator";
+import { WorkflowDetails } from "@/features/analysis-chat/WorkflowDetails";
 import type { usePlannerSession } from "@/features/analysis-chat/usePlannerSession";
 
-const running = {
-  preprocessing: {
-    agent: agents.preprocessing,
-  },
-  analysis: {
-    agent: agents.analysis,
-  },
-  interpretation: {
-    agent: agents.interpretation,
-  },
-  critic: {
-    agent: agents.critic,
-  },
-  chat: {
-    agent: agents.chat,
-  },
-} as const;
-
-type Session = ReturnType<typeof usePlannerSession>;
+type Session = Pick<ReturnType<typeof usePlannerSession>,
+  "busy" | "phase" | "plan" | "report" | "analysis" | "interpretation" | "critique" | "answer" | "error"
+>;
 
 export function WorkflowTurns({ session }: { session: Session }) {
-  const active = running[session.phase as keyof typeof running];
+  const hasDetails = session.plan || session.report || session.analysis || session.interpretation || session.critique;
   return (
     <>
-      {session.plan && (
-        <AnalysisPlanCard
-          plan={session.plan}
-          running={session.phase === "preprocessing"}
-        />
-      )}
-      {session.report && <PreprocessingReportCard report={session.report} />}
-      {session.analysis && <AnalysisReportCard analysis={session.analysis} />}
-      {session.interpretation && (
-        <InterpretationCard interpretation={session.interpretation} />
-      )}
-      {session.critique && <CriticCard critique={session.critique} />}
+      {session.busy && <ThinkingIndicator agent={agents.assistant} label="Analyzing data…" />}
       {session.answer && (
         <ChatAnswerCard
           answer={session.answer}
           figures={session.analysis?.figures ?? []}
+          tables={session.analysis?.tables ?? []}
         />
       )}
-      {active && <ThinkingIndicator agent={active.agent} />}
       {session.phase === "error" && session.error && (
-        <AgentTurn agent={session.errorAgent}>
-          <p className="text-base leading-7 text-destructive" role="alert">
-            {session.error}
-          </p>
+        <AgentTurn agent={agents.assistant}>
+          <p className="text-base leading-7 text-destructive" role="alert">{session.error}</p>
         </AgentTurn>
+      )}
+      {hasDetails && (
+        <WorkflowDetails>
+          {session.plan && <AnalysisPlanCard plan={session.plan} running={session.phase === "preprocessing"} />}
+          {session.report && <PreprocessingReportCard report={session.report} />}
+          {session.analysis && <AnalysisReportCard analysis={session.analysis} />}
+          {session.interpretation && <InterpretationCard interpretation={session.interpretation} />}
+          {session.critique && <CriticCard critique={session.critique} />}
+        </WorkflowDetails>
       )}
     </>
   );

@@ -54,7 +54,7 @@ function PlanDetails({ plan }: { plan: AnalysisPlan }) {
     <Card className="overflow-hidden shadow-none" id="analysis-plan-details">
       <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 border-b p-4">
         <div>
-          <h2 className="text-lg font-semibold" id="analysis-plan-title">
+          <h2 className="text-xl font-semibold leading-7 tracking-tight" id="analysis-plan-title">
             Analysis plan
           </h2>
           <p className="mt-1 text-base leading-7 text-muted-foreground">
@@ -67,7 +67,7 @@ function PlanDetails({ plan }: { plan: AnalysisPlan }) {
       </CardHeader>
       <CardContent className="p-4">
         <div className="rounded-lg bg-muted/70 px-3 py-2.5">
-          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-sm font-medium text-muted-foreground">
             Objective
           </p>
           <p className="mt-1 text-base leading-7">{plan.objective}</p>
@@ -79,7 +79,7 @@ function PlanDetails({ plan }: { plan: AnalysisPlan }) {
                 {index + 1}
               </span>
               <div className="min-w-0 pt-0.5">
-                <h3 className="text-base font-semibold">{step.title}</h3>
+                <h3 className="text-lg font-semibold leading-7 tracking-tight">{step.title}</h3>
                 <p className="mt-1 text-base leading-7 text-muted-foreground">
                   {step.description}
                 </p>

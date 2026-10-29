@@ -85,10 +85,12 @@ body {
   min-height: 100vh;
 }
 
-button,
-input,
-textarea {
-  font: inherit;
+@layer base {
+  button,
+  input,
+  textarea {
+    font: inherit;
+  }
 }
 
 button {
@@ -105,10 +107,10 @@ button {
 }
 
 .thinking-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
-  background: #2f855f;
+  background: #2f946c;
   animation: thinking 1.1s ease-in-out infinite;
 }
 

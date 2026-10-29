@@ -8,9 +8,7 @@ describe("AppSidebar", () => {
   it("shows an honest empty state instead of example history", () => {
     render(
       <AppSidebar
-        dataset={null}
         onNewAnalysis={vi.fn()}
-        onReplaceDataset={vi.fn()}
       />,
     );
 
@@ -23,9 +21,7 @@ describe("AppSidebar", () => {
     const user = userEvent.setup();
     render(
       <AppSidebar
-        dataset={null}
         onNewAnalysis={onNewAnalysis}
-        onReplaceDataset={vi.fn()}
       />,
     );
 
