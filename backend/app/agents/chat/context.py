@@ -1,13 +1,17 @@
 """Serialize chat evidence without raw exceptions or private storage locations."""
 
+import json
+
 from pydantic import JsonValue
 
 from backend.app.contracts.models import AnalysisResult, ResultReference, WarningEvent
 
+from .references import known_ids
 from .schema import ChatContext
 
 
 def serialize_context(context: ChatContext) -> str:
+    """Include the citable IDs so the model does not cite section names."""
     safe = context.model_copy(deep=True)
     safe.warnings = [_safe_warning(warning) for warning in safe.warnings]
     if safe.preprocessing_report is not None:
@@ -17,7 +21,9 @@ def serialize_context(context: ChatContext) -> str:
     for result in safe.analysis_results:
         result.warnings = [_safe_warning(warning) for warning in result.warnings]
         result.values = _safe_values(result)
-    return safe.model_dump_json()
+    payload = safe.model_dump(mode="json")
+    payload["valid_reference_ids"] = sorted(known_ids(context))
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _safe_values(result: AnalysisResult) -> dict[str, JsonValue]:

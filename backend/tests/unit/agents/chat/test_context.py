@@ -67,6 +67,7 @@ def test_process_evidence_survives_without_private_details():
         },
         {"status": "stored_as_artifact"},
     ]
+    assert payload["valid_reference_ids"] == ["failed", "ok", "stored"]
     assert context.analysis_results[1].values["error"] == PRIVATE
 
 
@@ -76,6 +77,7 @@ def test_minimal_context_serializes_empty_evidence():
     assert payload["message"] == "Hi"
     assert payload["analysis_results"] == []
     assert payload["final_answer"] is None
+    assert payload["valid_reference_ids"] == []
 
 
 def test_context_requires_a_message():
