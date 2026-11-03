@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import Field, JsonValue, StringConstraints
 
+from .dialogue import DialogueTurn
 from .errors import AgentError
 from .final_response import FinalResponse
 from .models import (
@@ -34,6 +35,11 @@ class WorkflowQuery(ContractModel):
 class ResumeWorkflow(WorkflowQuery):
     checkpoint_id: str = Field(min_length=1)
     answer: Question
+
+
+class SendMessage(WorkflowQuery):
+    checkpoint_id: str = Field(min_length=1)
+    message: Question
 
 
 class FigurePreview(ContractModel):
@@ -77,3 +83,6 @@ class WorkflowSnapshot(ContractModel):
     critique: Critique | None = None
     answer: FinalResponse | None = None
     error: AgentError | None = None
+    dialogue: list[DialogueTurn] = Field(default_factory=list)
+    analysis_round: int = Field(default=1, ge=1)
+    accepts_messages: bool = False

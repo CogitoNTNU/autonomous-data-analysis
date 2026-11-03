@@ -10,6 +10,7 @@ from typing import IO
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
+from backend.app.contracts.dialogue import DialogueTurn
 from backend.app.contracts.errors import AgentError
 from backend.app.contracts.final_response import FinalResponse
 from backend.app.contracts.models import (
@@ -51,6 +52,7 @@ CHECKPOINT_TYPES = (
     CritiqueIssue,
     RevisionRecord,
     FinalResponse,
+    DialogueTurn,
 )
 
 

@@ -3,6 +3,7 @@
 from typing import TypedDict
 from uuid import uuid4
 
+from .dialogue import DialogueTurn
 from .errors import AgentError
 from .final_response import FinalResponse
 from .models import (
@@ -44,6 +45,8 @@ class AgentState(TypedDict):
     control: RunControl
     clarification_question: str | None
     clarification_count: int
+    dialogue: list[DialogueTurn]
+    analysis_round: int
 
 
 def create_initial_state(
@@ -80,4 +83,6 @@ def create_initial_state(
         control=RunControl(max_revisions=max_revisions, max_retries=max_retries),
         clarification_question=None,
         clarification_count=0,
+        dialogue=[],
+        analysis_round=1,
     )
