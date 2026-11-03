@@ -13,6 +13,7 @@ from backend.app.services.analysis_request import (
     public_artifact,
     public_result,
 )
+from backend.app.services.interrupt_kinds import interrupt_kinds
 
 
 def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnapshot:
@@ -24,7 +25,7 @@ def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnap
     status = "running"
     active = next(
         (
-            node
+            "chat" if node == "dialogue" else node
             for node in snapshot.next
             if node
             in {
@@ -34,6 +35,7 @@ def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnap
                 "interpretation",
                 "critic",
                 "chat",
+                "dialogue",
             }
         ),
         None,
@@ -112,4 +114,7 @@ def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnap
         critique=state["critique"],
         answer=state["final_response"],
         error=public_error,
+        dialogue=state.get("dialogue", []),
+        analysis_round=state.get("analysis_round", 1),
+        accepts_messages=not running and "message" in interrupt_kinds(snapshot),
     )

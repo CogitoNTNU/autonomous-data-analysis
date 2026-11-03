@@ -1,20 +1,22 @@
 """Record node timings and outcomes without logging prompts or result values."""
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from time import perf_counter
+from typing import TypeVar
 
+from backend.app.contracts.errors import AgentError
 from backend.app.contracts.models import AgentName
 from backend.app.contracts.state import AgentState
 
-from .responses import AgentStateUpdate
+UpdateT = TypeVar("UpdateT", bound=Mapping[str, object])
 
 
 def measured_node(
     agent: AgentName,
-    execute: Callable[[AgentState], AgentStateUpdate],
-) -> Callable[[AgentState], AgentStateUpdate]:
-    def run(state: AgentState) -> AgentStateUpdate:
+    execute: Callable[[AgentState], UpdateT],
+) -> Callable[[AgentState], UpdateT]:
+    def run(state: AgentState) -> UpdateT:
         logger = logging.getLogger(__name__)
         retrying = (
             state["control"].current_agent == agent
@@ -49,7 +51,7 @@ def measured_node(
             extra={
                 **fields,
                 "duration_seconds": round(perf_counter() - started, 3),
-                "error_category": error.code if error else None,
+                "error_category": error.code if isinstance(error, AgentError) else None,
             },
         )
         return updates

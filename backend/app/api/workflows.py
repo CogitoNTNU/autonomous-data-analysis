@@ -1,4 +1,4 @@
-"""HTTP boundary for starting, observing, and clarifying harness runs."""
+"""HTTP boundary for starting, observing, clarifying, and messaging harness runs."""
 
 import json
 import os
@@ -7,13 +7,23 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
-from backend.app.contracts.workflow import ResumeWorkflow, StartWorkflow, WorkflowQuery
+from backend.app.contracts.workflow import (
+    ResumeWorkflow,
+    SendMessage,
+    StartWorkflow,
+    WorkflowQuery,
+)
 from backend.app.services.workflow_dataset import workflow_dataset
 
 if TYPE_CHECKING:
     from backend.app.api.planner_server import PlannerApp
 
-ROUTES = {"/api/workflows", "/api/workflows/status", "/api/workflows/resume"}
+ROUTES = {
+    "/api/workflows",
+    "/api/workflows/status",
+    "/api/workflows/resume",
+    "/api/workflows/messages",
+}
 
 
 def dispatch_workflow(
@@ -32,6 +42,8 @@ def dispatch_workflow(
             )
         elif path == "/api/workflows/resume":
             result = app.workflows.resume(ResumeWorkflow.model_validate_json(body))
+        elif path == "/api/workflows/messages":
+            result = app.workflows.message(SendMessage.model_validate_json(body))
         else:
             result = app.workflows.status(
                 WorkflowQuery.model_validate_json(body).run_id

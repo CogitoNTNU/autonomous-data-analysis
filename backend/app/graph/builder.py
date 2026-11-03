@@ -7,6 +7,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from backend.app.agents.chat.reply import ChatModel
 from backend.app.agents.critic.agent import CriticModel
 from backend.app.agents.interpretation.schema import InterpretationModel
 from backend.app.agents.planner.agent import PlannerModel
@@ -14,7 +15,7 @@ from backend.app.contracts.models import AgentName
 from backend.app.contracts.state import AgentState
 from backend.app.tools.registry import ToolRegistry
 
-from .interaction import chat_graph_node, clarify
+from .conversation_wiring import add_conversation
 from .lifecycle import finish_run, start_run
 from .observability import measured_node
 from .responses import AgentStateUpdate
@@ -42,21 +43,18 @@ def build_graph(
     critic_model: CriticModel,
     checkpointer: BaseCheckpointSaver | None = None,
     conversational: bool = False,
+    chat_model: ChatModel | None = None,
 ) -> CompiledStateGraph:
     """Inject models; all revision and retry budgets come from the run's state."""
     if conversational and checkpointer is None:
         raise ValueError("Interactive workflows require a checkpointer")
     builder = StateGraph(AgentState)
     if conversational:
-        builder.add_node("clarification", clarify)
-        builder.add_conditional_edges(
-            "clarification",
-            lambda state: "finish_run" if state["last_node_error"] else "planner",
-            {"finish_run": "finish_run", "planner": "planner"},
-        )
-        builder.add_node("chat", measured_node("chat", chat_graph_node))
-        builder.add_edge("chat", "finish_run")
-
+        if chat_model is None:
+            raise ValueError("Interactive workflows require a chat model")
+        add_conversation(builder, chat_model)
+    else:
+        builder.add_edge("finish_run", END)
     builder.add_node("start_run", start_run)
     builder.add_node("finish_run", finish_run)
     stages: dict[AgentName, Callable[[AgentState], AgentStateUpdate]] = {
@@ -114,7 +112,6 @@ def build_graph(
             **({"chat": "chat"} if conversational else {}),
         },
     )
-    builder.add_edge("finish_run", END)
     return builder.compile(checkpointer=checkpointer)
 
 

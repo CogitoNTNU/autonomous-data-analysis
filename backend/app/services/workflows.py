@@ -11,17 +11,24 @@ from langgraph.graph import START
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
+from backend.app.agents.chat.reply import ChatModel
 from backend.app.agents.critic.agent import CriticModel
 from backend.app.agents.interpretation.schema import InterpretationModel
 from backend.app.agents.planner.agent import PlannerModel
 from backend.app.contracts.models import DatasetReference
 from backend.app.contracts.state import create_initial_state
-from backend.app.contracts.workflow import ResumeWorkflow, WorkflowSnapshot
+from backend.app.contracts.workflow import (
+    ResumeWorkflow,
+    SendMessage,
+    WorkflowSnapshot,
+)
 from backend.app.graph.builder import build_graph
 from backend.app.graph.limits import workflow_recursion_limit
+from backend.app.services.chat_model import live_chat_model
 from backend.app.services.lazy_model import lazy_model
 from backend.app.services.workflow_failure import persist_failure
 from backend.app.services.workflow_snapshot import workflow_snapshot
+from backend.app.services.workflow_waiting import InputKind, require_waiting
 from backend.app.storage.workflow_checkpoints import WorkflowCheckpoints
 from backend.app.tools.registry import ToolRegistry
 
@@ -34,9 +41,11 @@ class WorkflowService:
         planner: Callable[[], PlannerModel],
         interpretation: Callable[[], InterpretationModel],
         critic: Callable[[], CriticModel],
+        chat: Callable[[], ChatModel] = live_chat_model,
     ) -> None:
         self.store, self.registry = store, registry
         self.planner, self.interpretation, self.critic = planner, interpretation, critic
+        self.chat = chat
         self.workers = ThreadPoolExecutor(max_workers=4, thread_name_prefix="workflow")
 
     @contextmanager
@@ -45,6 +54,7 @@ class WorkflowService:
             planner = lazy_model(self.planner, resources)
             interpretation = lazy_model(self.interpretation, resources)
             critic = lazy_model(self.critic, resources)
+            chat = lazy_model(self.chat, resources)
             yield build_graph(
                 self.registry,
                 lambda prompt, context: planner()(prompt, context),
@@ -54,6 +64,7 @@ class WorkflowService:
                 critic_model=lambda prompt, context: critic()(prompt, context),
                 checkpointer=saver,
                 conversational=True,
+                chat_model=lambda prompt, context: chat()(prompt, context),
             )
 
     def start(self, dataset: DatasetReference, question: str) -> WorkflowSnapshot:
@@ -76,29 +87,34 @@ class WorkflowService:
         return workflow_snapshot(snapshot, running=running)
 
     def resume(self, request: ResumeWorkflow) -> WorkflowSnapshot:
-        run_id = str(request.run_id)
-        lease = self.store.acquire(run_id)
+        return self._continue(
+            request.run_id,
+            request.checkpoint_id,
+            "clarification",
+            {"answer": request.answer},
+        )
+
+    def message(self, request: SendMessage) -> WorkflowSnapshot:
+        return self._continue(
+            request.run_id,
+            request.checkpoint_id,
+            "message",
+            {"message": request.message},
+        )
+
+    def _continue(
+        self, run_id: UUID, checkpoint_id: str, kind: InputKind, value: dict[str, str]
+    ) -> WorkflowSnapshot:
+        lease = self.store.acquire(str(run_id))
         try:
             with self.graph() as graph:
-                snapshot = graph.get_state(_config(run_id))
-            if not snapshot.values:
-                raise ValueError("Unknown workflow")
-            if (
-                snapshot.config["configurable"]["checkpoint_id"]
-                != request.checkpoint_id
-            ):
-                raise ValueError(
-                    "The workflow has changed. Refresh its status before replying."
-                )
-            if not snapshot.interrupts or not snapshot.values["clarification_question"]:
-                raise ValueError("This workflow is not waiting for clarification")
-            self.workers.submit(
-                self._run, run_id, Command(resume={"answer": request.answer}), lease
-            )
+                snapshot = graph.get_state(_config(str(run_id)))
+            require_waiting(snapshot, checkpoint_id, kind)
+            self.workers.submit(self._run, str(run_id), Command(resume=value), lease)
         except Exception:
             lease.close()
             raise
-        return self.status(request.run_id)
+        return self.status(run_id)
 
     def _run(self, run_id: str, command: Command | None, lease: IO[bytes]) -> None:
         with lease, self.graph() as graph:
