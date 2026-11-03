@@ -13,7 +13,10 @@ const nextRound: WorkflowSnapshot = { ...completed, status: "running", analysis:
 
 describe("analysis rounds", () => {
   it("keeps the previous answer and charts when the next round starts", () => {
-    expect(archiveRound([], completed, nextRound)).toEqual([{ round: 1, answer, figures: [figure], tables: [] }]);
+    expect(archiveRound([], completed, nextRound)).toEqual([{
+      round: 1, answer, figures: [figure], tables: [], plan: null, report: null,
+      analysis: completed.analysis, interpretation: null, critique: null,
+    }]);
   });
 
   it("does not archive again while the next round is still running", () => {

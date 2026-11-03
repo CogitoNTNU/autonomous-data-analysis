@@ -11,6 +11,19 @@ describe("ChatScrollArea", () => {
     expect(screen.queryByRole("button", { name: "Back to top" })).toBeNull();
   });
 
+  it("follows new content until the reader scrolls away", () => {
+    const { rerender } = render(<ChatScrollArea>One</ChatScrollArea>);
+    const viewport = screen.getByRole("region", { name: "Conversation" });
+    Object.defineProperty(viewport, "scrollHeight", { configurable: true, value: 500 });
+    Object.defineProperty(viewport, "clientHeight", { configurable: true, value: 100 });
+    rerender(<ChatScrollArea>One more</ChatScrollArea>);
+    expect(viewport.scrollTop).toBe(500);
+    viewport.scrollTop = 0;
+    fireEvent.scroll(viewport);
+    rerender(<ChatScrollArea>One more line</ChatScrollArea>);
+    expect(viewport.scrollTop).toBe(0);
+  });
+
   it("scrolls the conversation to the top and hides the arrow after returning", async () => {
     vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }));
     const user = userEvent.setup();

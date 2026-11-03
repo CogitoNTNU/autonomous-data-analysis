@@ -14,5 +14,10 @@ export function archiveRound(
     answer: previous.answer,
     figures: previous.analysis?.figures ?? [],
     tables: previous.analysis?.tables ?? [],
+    plan: previous.plan,
+    report: previous.report,
+    analysis: previous.analysis,
+    interpretation: previous.interpretation,
+    critique: previous.critique,
   }];
 }

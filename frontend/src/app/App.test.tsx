@@ -95,7 +95,6 @@ describe("App dataset preview flow", () => {
     ).toBeVisible();
     expect(screen.getByRole("status", { name: "Analyzing data…" })).toBeVisible();
     expect(screen.getByLabelText("Analysis question")).toBeDisabled();
-    await user.click(await screen.findByRole("button", { name: "View analysis details" }));
     await user.click(
       await screen.findByRole("button", {
         name: "Prepared an analysis plan, 3 steps",
@@ -133,9 +132,7 @@ describe("App dataset preview flow", () => {
 
     expect(screen.getByText("Body mass")).toBeVisible();
     expect(screen.getByRole("status", { name: "Analyzing data…" })).toBeVisible();
-    expect(
-      await screen.findByRole("button", { name: "View analysis details" }),
-    ).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Prepared an analysis plan, 3 steps" })).toBeVisible();
   });
   it("starts a new question without discarding the loaded dataset", async () => {
     const user = userEvent.setup();
@@ -150,9 +147,7 @@ describe("App dataset preview flow", () => {
         name: "Summarize the most important patterns",
       }),
     );
-    expect(
-      await screen.findByRole("button", { name: "View analysis details" }),
-    ).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Prepared an analysis plan, 3 steps" })).toBeVisible();
 
     await user.click(
       screen.getByRole("button", { name: "Start new analysis" }),
@@ -183,9 +178,7 @@ describe("App dataset preview flow", () => {
         name: "Summarize the most important patterns",
       }),
     );
-    expect(
-      await screen.findByRole("button", { name: "View analysis details" }),
-    ).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Prepared an analysis plan, 3 steps" })).toBeVisible();
     expect(screen.queryByText(/The uploaded CSV is the dataset/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Prepare dataset" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Show final answer" })).toBeNull();
@@ -193,9 +186,8 @@ describe("App dataset preview flow", () => {
     expect(
       await screen.findByText("The prepared columns can be compared."),
     ).toBeVisible();
-    expect(screen.queryByText("Preprocessing finished, 2 rows to 2")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "View analysis details" }));
     expect(screen.getByText("Preprocessing finished, 2 rows to 2")).toBeVisible();
+    expect(screen.getByText("Critic approved").compareDocumentPosition(screen.getByText("The prepared columns can be compared.")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Analysis finished, 1 result")).toBeVisible();
     expect(screen.getByText("Interpretation finished")).toBeVisible();
     expect(screen.getByText("Critic approved")).toBeVisible();

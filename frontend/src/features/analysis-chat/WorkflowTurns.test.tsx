@@ -16,36 +16,28 @@ const session: Session = {
   rounds: [], dialogue: [], analysisRound: 1, acceptsMessages: false, pendingMessage: null, submitQuestion: () => {},
 };
 const turn = { referencedIds: [], startsAnalysis: false, failed: false };
+const emptyRound = { figures: [], tables: [], plan: null, report: null, analysis: null, interpretation: null, critique: null };
 
-describe("concise workflow presentation", () => {
-  it("keeps the answer and caveats visible while processing details are collapsed", async () => {
-    const user = userEvent.setup();
+function follows(earlier: string, later: string) {
+  const position = screen.getByText(earlier).compareDocumentPosition(screen.getByText(later));
+  expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
+
+describe("chronological workflow transcript", () => {
+  it("shows each stage and then the answer beneath the critic", () => {
     render(<WorkflowTurns session={session} />);
     expect(screen.getByText(session.answer!.text)).toBeVisible();
     expect(screen.getByText(session.answer!.limitations[0])).toBeVisible();
-    expect(screen.queryByText("Planner")).toBeNull();
     expect(screen.queryByText("Full internal interpretation")).toBeNull();
-    const details = screen.getByRole("button", { name: "View analysis details" });
-    expect(details).toHaveAttribute("aria-expanded", "false");
-    details.focus();
-    await user.keyboard("{Enter}");
-    expect(details).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Planner")).toBeVisible();
-    expect(screen.getByText("PL")).toBeVisible();
-    expect(screen.getByText("PR")).toBeVisible();
-    expect(screen.getByText("IN")).toBeVisible();
-    expect(screen.getByText("CR")).toBeVisible();
-    expect(screen.queryByText("Behind the answer")).toBeNull();
-    expect(screen.getByText("Interpretation finished")).toBeVisible();
-    await user.keyboard("{Enter}");
-    expect(screen.queryByText("Planner")).toBeNull();
-    expect(screen.getByText(session.answer!.text)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "View analysis details" })).toBeNull();
+    follows("Planner", "PR");
+    follows("PR", "CR");
+    follows("Critic approved", session.answer!.text);
   });
 
   it("expands an agent card with the keyboard and preserves the main answer", async () => {
     const user = userEvent.setup();
     render(<WorkflowTurns session={session} />);
-    await user.click(screen.getByRole("button", { name: "View analysis details" }));
     const stage = screen.getByRole("button", { name: "Interpretation finished" });
     stage.focus();
     await user.keyboard("{Enter}");
@@ -57,26 +49,25 @@ describe("concise workflow presentation", () => {
     expect(screen.getByText(session.answer!.text)).toBeVisible();
   });
 
-  it.each(["thinking", "analysis", "critic"] as const)("shows one progress indicator during %s", (phase) => {
+  it.each(["thinking", "analysis", "critic"] as const)("shows progress after the stages that have arrived during %s", (phase) => {
     render(<WorkflowTurns session={{ ...session, busy: true, phase, answer: null }} />);
     expect(screen.getAllByRole("status")).toHaveLength(1);
-    expect(screen.getByRole("status", { name: "Analyzing data…" })).toBeVisible();
-    expect(screen.queryByText("Planner")).toBeNull();
+    follows("Critic approved", "Analyzing data…");
   });
 
-  it("shows earlier rounds, their dialogue, and the pending follow-up in order", () => {
-    const earlier = { round: 1, answer: { ...session.answer!, text: "Adelie are lightest." }, figures: [], tables: [] };
+  it("appends a new round after the earlier transcript", () => {
+    const earlier = { ...emptyRound, round: 1, answer: { ...session.answer!, text: "Adelie are lightest." }, plan: createPrototypeAnalysisPlan("Earlier") };
     render(<WorkflowTurns session={{ ...session, busy: true, phase: "chat", rounds: [earlier], analysisRound: 2, pendingMessage: "Why Gentoo?", dialogue: [
       { ...turn, role: "user", content: "Compare Gentoo", analysisRound: 1 },
       { ...turn, role: "assistant", content: "Starting a comparison.", analysisRound: 1, startsAnalysis: true },
     ] }} />);
-    const order = ["Adelie are lightest.", "Compare Gentoo", "Starting a comparison.", session.answer!.text, "Why Gentoo?"]
-      .map((text) => screen.getByText(text));
-    order.slice(1).forEach((node, index) => {
-      expect(order[index].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    });
+    const plans = screen.getAllByRole("button", { name: "Prepared an analysis plan, 3 steps" });
+    expect(plans[0].compareDocumentPosition(screen.getByText("Adelie are lightest.")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    follows("Adelie are lightest.", "Compare Gentoo");
+    expect(screen.getByText("Starting a comparison.").compareDocumentPosition(plans[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    follows(session.answer!.text, "Why Gentoo?");
     expect(screen.getByText("New analysis requested")).toBeVisible();
-    expect(screen.getByRole("status", { name: "Writing a reply…" })).toBeVisible();
+    follows("Why Gentoo?", "Writing a reply…");
   });
 
   it("offers follow-up questions only when the run accepts messages", async () => {
@@ -90,10 +81,10 @@ describe("concise workflow presentation", () => {
     expect(screen.queryByRole("button", { name: "Which island?" })).toBeNull();
   });
 
-  it("keeps errors visible without requiring the details section", () => {
+  it("keeps an error after the stages that already appeared", () => {
     render(<WorkflowTurns session={{ ...session, phase: "error", answer: null, error: "The model service did not respond in time." }} />);
     expect(screen.getByRole("alert")).toHaveTextContent("did not respond in time");
     expect(screen.queryByRole("status")).toBeNull();
-    expect(screen.getByRole("button", { name: "View analysis details" })).toHaveAttribute("aria-expanded", "false");
+    follows("Critic approved", "The model service did not respond in time.");
   });
 });

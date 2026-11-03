@@ -110,7 +110,9 @@ describe("harness session", () => {
     client.status.mockResolvedValue({ ...done, analysisRound: 2, answer: { ...answer, text: "Score summary" } });
     act(() => result.current.submitQuestion("Describe score too"));
     await waitFor(() => expect(result.current.answer?.text).toBe("Score summary"), { timeout: 3000 });
-    expect(result.current.rounds).toEqual([{ round: 1, answer, figures: [], tables: [] }]);
+    expect(result.current.rounds).toEqual([{
+      round: 1, answer, figures: [], tables: [], plan: null, report: null, analysis: null, interpretation: null, critique: null,
+    }]);
     act(() => result.current.resetQuestion());
     expect(result.current.rounds).toEqual([]);
   });

@@ -1,4 +1,13 @@
-import type { AnalysisFigure, AnalysisTable, ChatAnswer } from "@/types/planner";
+import type {
+  AnalysisFigure,
+  AnalysisPlan,
+  AnalysisReport,
+  AnalysisTable,
+  ChatAnswer,
+  CritiqueView,
+  InterpretationView,
+  PreprocessingReport,
+} from "@/types/planner";
 
 export type DialogueTurn = {
   role: "user" | "assistant";
@@ -14,4 +23,9 @@ export type AnalysisRound = {
   answer: ChatAnswer;
   figures: AnalysisFigure[];
   tables: AnalysisTable[];
+  plan: AnalysisPlan | null;
+  report: PreprocessingReport | null;
+  analysis: AnalysisReport | null;
+  interpretation: InterpretationView | null;
+  critique: CritiqueView | null;
 };

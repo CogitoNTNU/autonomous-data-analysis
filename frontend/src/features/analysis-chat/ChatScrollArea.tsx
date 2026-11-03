@@ -1,13 +1,25 @@
 import { ArrowUp } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
+function nearBottom(element: HTMLDivElement): boolean {
+  return element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+}
+
 export function ChatScrollArea({ children }: { children: ReactNode }) {
   const viewport = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
+  useLayoutEffect(() => {
+    const element = viewport.current;
+    if (!element || !followLatest.current) return;
+    element.scrollTop = element.scrollHeight;
+  }, [children]);
+
   function backToTop() {
+    followLatest.current = false;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     viewport.current?.scrollTo({ top: 0, behavior: reducedMotion ? "instant" : "smooth" });
   }
@@ -19,7 +31,10 @@ export function ChatScrollArea({ children }: { children: ReactNode }) {
         role="region"
         aria-label="Conversation"
         className="h-full overflow-y-auto px-4 sm:px-16"
-        onScroll={(event) => setShowBackToTop(event.currentTarget.scrollTop > 160)}
+        onScroll={(event) => {
+          followLatest.current = nearBottom(event.currentTarget);
+          setShowBackToTop(event.currentTarget.scrollTop > 160);
+        }}
       >
         {children}
       </div>
