@@ -1,5 +1,6 @@
 """Build the pipeline with targeted Critic revisions and per-operation retries."""
 
+from collections.abc import Callable
 from functools import partial
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -9,12 +10,14 @@ from langgraph.graph.state import CompiledStateGraph
 from backend.app.agents.critic.agent import CriticModel
 from backend.app.agents.interpretation.schema import InterpretationModel
 from backend.app.agents.planner.agent import PlannerModel
+from backend.app.contracts.models import AgentName
 from backend.app.contracts.state import AgentState
 from backend.app.tools.registry import ToolRegistry
 
 from .interaction import chat_graph_node, clarify
 from .lifecycle import finish_run, start_run
 from .observability import measured_node
+from .responses import AgentStateUpdate
 from .nodes import (
     analysis_graph_node,
     critic_graph_node,
@@ -56,31 +59,17 @@ def build_graph(
 
     builder.add_node("start_run", start_run)
     builder.add_node("finish_run", finish_run)
-    builder.add_node(
-        "planner",
-        measured_node(
-            "planner",
-            partial(planner_graph_node, registry=registry, model=planner_model),
+    stages: dict[AgentName, Callable[[AgentState], AgentStateUpdate]] = {
+        "planner": partial(planner_graph_node, registry=registry, model=planner_model),
+        "preprocessing": preprocessing_graph_node,
+        "analysis": partial(analysis_graph_node, registry=registry),
+        "interpretation": partial(
+            interpretation_graph_node, model=interpretation_model
         ),
-    )
-    builder.add_node(
-        "preprocessing", measured_node("preprocessing", preprocessing_graph_node)
-    )
-    builder.add_node(
-        "analysis",
-        measured_node("analysis", partial(analysis_graph_node, registry=registry)),
-    )
-    builder.add_node(
-        "interpretation",
-        measured_node(
-            "interpretation",
-            partial(interpretation_graph_node, model=interpretation_model),
-        ),
-    )
-    builder.add_node(
-        "critic",
-        measured_node("critic", partial(critic_graph_node, model=critic_model)),
-    )
+        "critic": partial(critic_graph_node, model=critic_model),
+    }
+    for name, stage in stages.items():
+        builder.add_node(name, measured_node(name, stage))
     builder.add_edge(START, "start_run")
     builder.add_edge("start_run", "planner")
     builder.add_conditional_edges(
