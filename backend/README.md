@@ -29,23 +29,36 @@ Analysis, Interpretation, Critic, and final Chat presentation run automatically.
 Critic revisions and transient retries follow the harness routing and budgets.
 The final answer opens automatically; no stage approval is required.
 
-| Endpoint                     | JSON body                           | Purpose                                                    |
-| ---------------------------- | ----------------------------------- | ---------------------------------------------------------- |
-| `POST /api/datasets`         | Raw CSV body (`text/csv`)           | Register an immutable dataset                              |
-| `POST /api/workflows`        | `dataset_id`, `question`            | Start a background run and return its ID and snapshot      |
-| `POST /api/workflows/status` | `run_id`                            | Read persisted progress, results, charts, and final answer |
-| `POST /api/workflows/resume` | `run_id`, `checkpoint_id`, `answer` | Answer a pending Planner clarification in the same run     |
+| Endpoint                       | JSON body                            | Purpose                                                    |
+| ------------------------------ | ------------------------------------ | ---------------------------------------------------------- |
+| `POST /api/datasets`           | Raw CSV body (`text/csv`)            | Register an immutable dataset                              |
+| `POST /api/workflows`          | `dataset_id`, `question`             | Start a background run and return its ID and snapshot      |
+| `POST /api/workflows/status`   | `run_id`                             | Read persisted progress, results, charts, and final answer |
+| `POST /api/workflows/resume`   | `run_id`, `checkpoint_id`, `answer`  | Answer a pending Planner clarification in the same run     |
+| `POST /api/workflows/messages` | `run_id`, `checkpoint_id`, `message` | Send a follow-up message to a completed run                |
 
 The browser polls status while the run is active. The run reads the registered
 CSV from backend storage; a start or resume request cannot replace its contents. It never posts plans, calculated
 results, interpretations, or critique decisions back into the harness. A snapshot
 replaces the previous view so a revision cannot leave stale dependent outputs on
-screen. Clarification is the only user interrupt and is limited to three replies.
-A stale or duplicate clarification submission is rejected.
+screen. Clarification is limited to three replies. A stale or duplicate
+clarification or message submission is rejected.
+
+### Follow-up dialogue
+
+A completed run waits for follow-up messages while `accepts_messages` is true.
+The Chat agent answers questions about the process and results from the recorded
+plan, preprocessing report, results, critique, and revisions. It cannot calculate
+anything itself. When a message needs new calculations, the agent writes a
+self-contained request and the same run starts a new analysis round on the
+source dataset. The previous question, answer, and dialogue become the Planner's
+conversation context. The snapshot's `dialogue` and `analysis_round` record the
+conversation; each run accepts up to 20 messages. A failed chat reply is
+recorded as a failed turn and leaves the completed analysis unchanged.
 
 SQLite checkpoints and per-run worker locks live under
 `backend/data/uploads/.workflows/`. This directory is ignored by Git. Completed
-runs and pending clarifications survive backend restarts. If the backend exits
+runs, pending clarifications, and follow-up dialogue survive backend restarts. If the backend exits
 mid-execution, status reports an interrupted run explicitly; it does not silently
 repeat tool executions. Closing or replacing a chat stops browser polling but does
 not cancel an already executing backend run.
@@ -60,7 +73,7 @@ longer uses them.
 
 ## Model latency and request budgets
 
-All three LLM adapters read the same validated settings. SDK retries are disabled;
+All LLM adapters read the same validated settings. SDK retries are disabled;
 LangGraph owns retries, with one retry for transient failures in a web run. A
 failed Interpretation retry reuses its client and calculated evidence; it does
 not repeat preprocessing or analysis.
