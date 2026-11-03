@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 type AnalysisQuestionComposerProps = {
   disabled: boolean;
   finished?: boolean;
+  followUp?: boolean;
   hasDataset: boolean;
   onChange: (question: string) => void;
   onSubmit: (question: string) => void;
@@ -17,6 +18,7 @@ type AnalysisQuestionComposerProps = {
 export function AnalysisQuestionComposer({
   disabled,
   finished = false,
+  followUp = false,
   hasDataset,
   onChange,
   onSubmit,
@@ -60,7 +62,9 @@ export function AnalysisQuestionComposer({
                   ? finished
                     ? "Analysis finished"
                     : "Question received"
-                  : "What would you like to learn from the dataset?"
+                  : followUp
+                    ? "Ask about the analysis or request a new one"
+                    : "What would you like to learn from the dataset?"
                 : "Upload a CSV to start"
             }
             rows={1}

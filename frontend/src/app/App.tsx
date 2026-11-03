@@ -23,7 +23,7 @@ export function App({ planner }: AppProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { theme, toggleTheme } = useTheme();
   const session = usePlannerSession(planner);
-  const waiting = session.busy || session.phase === "complete" || session.phase === "clarification";
+  const waiting = session.busy || (session.phase === "complete" && !session.acceptsMessages) || session.phase === "clarification";
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
@@ -68,6 +68,7 @@ export function App({ planner }: AppProps) {
         <AnalysisQuestionComposer
           disabled={waiting || session.dataset === null}
           finished={session.phase === "complete"}
+          followUp={session.acceptsMessages}
           hasDataset={session.dataset !== null}
           onChange={session.setQuestion}
           onSubmit={session.submitQuestion}

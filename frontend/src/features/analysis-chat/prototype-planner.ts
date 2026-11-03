@@ -23,9 +23,13 @@ export const prototypePlanner: WorkflowClient = {
       activeAgent: "planner", question: clarification?.question ?? null,
       plan: clarification ? null : createPrototypeAnalysisPlan(question),
       report: null, analysis: null, interpretation: null, critique: null, answer: null, error: null,
+      dialogue: [], analysisRound: 1, acceptsMessages: false,
     };
     previews.set(result.runId, result);
     return result;
+  },
+  async message() {
+    throw new Error("Follow-up messages need the backend harness");
   },
   async resume({ runId, answer }) {
     await wait(PREVIEW_DELAY_MS);

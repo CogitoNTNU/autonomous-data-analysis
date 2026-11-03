@@ -1,11 +1,13 @@
 import { mapAnalysisPayload } from "@/api/analysis-response";
 import { mapAnswerPayload } from "@/api/answer-response";
 import { mapCritiquePayload } from "@/api/critique-response";
+import { mapDialogue } from "@/api/dialogue-response";
 import { mapInterpretationPayload } from "@/api/interpretation-response";
 import { isRecord } from "@/api/payload/is-record";
 import { requiredText } from "@/api/payload/required-text";
 import { mapPlannerPayload } from "@/api/planner-response";
 import { mapPreprocessingPayload } from "@/api/preprocessing-response";
+import type { DialogueTurn } from "@/types/dialogue";
 import type { AnalysisPlan, AnalysisReport, ChatAnswer, CritiqueView, InterpretationView, PreprocessingReport } from "@/types/planner";
 
 export type WorkflowAgent = "planner" | "preprocessing" | "analysis" | "interpretation" | "critic" | "chat";
@@ -22,15 +24,20 @@ export type WorkflowSnapshot = {
   critique: CritiqueView | null;
   answer: ChatAnswer | null;
   error: string | null;
+  dialogue: DialogueTurn[];
+  analysisRound: number;
+  acceptsMessages: boolean;
 };
 
 export type WorkflowStart = { datasetId: string; question: string; columns: string[] };
 export type WorkflowResume = { runId: string; checkpointId: string; answer: string };
+export type WorkflowMessage = { runId: string; checkpointId: string; message: string };
 export type WorkflowClient = {
   registerDataset: (file: File) => Promise<{ dataset_id: string }>;
   start: (input: WorkflowStart, signal?: AbortSignal) => Promise<WorkflowSnapshot>;
   status: (runId: string, signal?: AbortSignal) => Promise<WorkflowSnapshot>;
   resume: (input: WorkflowResume, signal?: AbortSignal) => Promise<WorkflowSnapshot>;
+  message: (input: WorkflowMessage, signal?: AbortSignal) => Promise<WorkflowSnapshot>;
 };
 
 export const browserWorkflow: WorkflowClient = {
@@ -52,6 +59,11 @@ export const browserWorkflow: WorkflowClient = {
       run_id: input.runId, checkpoint_id: input.checkpointId, answer: input.answer,
     }), signal));
   },
+  async message(input, signal) {
+    return mapWorkflow(await request("/api/workflows/messages", JSON.stringify({
+      run_id: input.runId, checkpoint_id: input.checkpointId, message: input.message,
+    }), signal));
+  },
 };
 
 export function mapWorkflow(value: unknown): WorkflowSnapshot {
@@ -65,6 +77,8 @@ export function mapWorkflow(value: unknown): WorkflowSnapshot {
   const answer = value.answer === null ? null : mapAnswerPayload({ status: "success", answer: value.answer });
   if ((plan && plan.status !== "plan") || (report && report.status !== "report") || (analysis && analysis.status !== "analysis") || (interpretation && interpretation.status !== "interpretation") || (critique && critique.status !== "critique") || (answer && answer.status !== "answer")) throw new Error("Invalid workflow output");
   if (value.status === "completed" && !answer) throw new Error("The completed workflow has no answer");
+  const round = value.analysis_round;
+  if (typeof round !== "number" || !Number.isInteger(round) || round < 1) throw new Error("Unreadable workflow status");
   return {
     runId: requiredText(value.run_id, "Workflow"),
     checkpointId: requiredText(value.checkpoint_id, "Workflow"),
@@ -78,6 +92,9 @@ export function mapWorkflow(value: unknown): WorkflowSnapshot {
     critique: critique?.status === "critique" ? critique.critique : null,
     answer: answer?.status === "answer" ? answer.answer : null,
     error: value.error === null ? null : requiredText(isRecord(value.error) ? value.error.message : null, "Workflow"),
+    dialogue: mapDialogue(value.dialogue),
+    analysisRound: round,
+    acceptsMessages: value.accepts_messages === true,
   };
 }
 

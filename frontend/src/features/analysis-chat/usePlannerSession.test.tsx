@@ -8,14 +8,27 @@ const preview = { fileName: "ages.csv", fileSize: 10, rowCount: 2, columnCount: 
 const initial: WorkflowSnapshot = {
   runId: "run-1", checkpointId: "checkpoint-1", status: "running", activeAgent: "planner",
   question: null, plan: null, report: null, analysis: null, interpretation: null, critique: null, answer: null, error: null,
+  dialogue: [], analysisRound: 1, acceptsMessages: false,
 };
+const answer = { text: "Age summary", findings: [], limitations: [], figureIds: [], followUps: [] };
+const done: WorkflowSnapshot = { ...initial, status: "completed", activeAgent: null, answer, acceptsMessages: true };
+const turn = { analysisRound: 1, referencedIds: [], startsAnalysis: false, failed: false };
 function fakeClient() {
   return {
     registerDataset: vi.fn().mockResolvedValue({ dataset_id: "dataset-1" }),
     start: vi.fn().mockResolvedValue(initial),
-    status: vi.fn().mockResolvedValue({ ...initial, status: "completed", answer: { text: "Age summary", findings: [], limitations: [], figureIds: [], followUps: [] } }),
+    status: vi.fn().mockResolvedValue({ ...initial, status: "completed", answer }),
     resume: vi.fn().mockResolvedValue(initial),
+    message: vi.fn().mockResolvedValue({ ...done, status: "running" }),
   };
+}
+async function completeRun(client: ReturnType<typeof fakeClient>) {
+  client.start.mockResolvedValue(done);
+  const hook = renderHook(() => usePlannerSession(client));
+  await act(async () => { await hook.result.current.acceptDataset(preview, file); });
+  act(() => hook.result.current.submitQuestion("Describe age"));
+  await waitFor(() => expect(hook.result.current.acceptsMessages).toBe(true));
+  return hook.result;
 }
 
 describe("harness session", () => {
@@ -73,6 +86,33 @@ describe("harness session", () => {
     await waitFor(() => expect(result.current.phase).toBe("error"), { timeout: 3000 });
     expect(result.current.error).toBe("Workflow storage is unavailable");
     expect(client.status).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends follow-up messages to the same run and shows them until answered", async () => {
+    const client = fakeClient();
+    const result = await completeRun(client);
+    client.status.mockResolvedValue({ ...done, dialogue: [
+      { ...turn, role: "user", content: "Why?" }, { ...turn, role: "assistant", content: "Missing ages." },
+    ] });
+    act(() => result.current.submitQuestion("Why?"));
+    expect(result.current.pendingMessage).toBe("Why?");
+    expect(client.message).toHaveBeenCalledWith({ runId: "run-1", checkpointId: "checkpoint-1", message: "Why?" }, expect.any(AbortSignal));
+    await waitFor(() => expect(result.current.dialogue).toHaveLength(2), { timeout: 3000 });
+    expect(result.current.pendingMessage).toBeNull();
+    expect(result.current.phase).toBe("complete");
+    expect(client.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the previous answer when a follow-up starts a new analysis round", async () => {
+    const client = fakeClient();
+    const result = await completeRun(client);
+    client.message.mockResolvedValue({ ...done, status: "running", answer: null, analysisRound: 2, acceptsMessages: false });
+    client.status.mockResolvedValue({ ...done, analysisRound: 2, answer: { ...answer, text: "Score summary" } });
+    act(() => result.current.submitQuestion("Describe score too"));
+    await waitFor(() => expect(result.current.answer?.text).toBe("Score summary"), { timeout: 3000 });
+    expect(result.current.rounds).toEqual([{ round: 1, answer, figures: [], tables: [] }]);
+    act(() => result.current.resetQuestion());
+    expect(result.current.rounds).toEqual([]);
   });
 
   it("cannot start with a failed upload", async () => {

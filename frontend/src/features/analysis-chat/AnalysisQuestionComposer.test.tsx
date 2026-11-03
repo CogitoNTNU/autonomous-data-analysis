@@ -50,4 +50,14 @@ describe("AnalysisQuestionComposer", () => {
 
     expect(onSubmit).toHaveBeenCalledWith("average mass");
   });
+
+  it("invites follow-up questions after a finished analysis", () => {
+    const props = { hasDataset: true, onChange: vi.fn(), onSubmit: vi.fn(), question: "", finished: true };
+    const { rerender } = render(<AnalysisQuestionComposer {...props} disabled={false} followUp />);
+    expect(screen.getByLabelText("Analysis question")).toHaveAttribute("placeholder", "Ask about the analysis or request a new one");
+    expect(screen.getByLabelText("Analysis question")).toBeEnabled();
+
+    rerender(<AnalysisQuestionComposer {...props} disabled followUp={false} />);
+    expect(screen.getByLabelText("Analysis question")).toHaveAttribute("placeholder", "Analysis finished");
+  });
 });
