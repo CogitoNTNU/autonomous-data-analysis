@@ -28,6 +28,7 @@ from backend.app.contracts.responses import AgentResponse, ResponseStatus
 from backend.app.contracts.state import AgentState
 
 from .limits import can_retry
+from .preprocessing_repair import is_preprocessing_repair
 from .updates import outcome_updates
 
 SupportedUpdates = (
@@ -122,6 +123,7 @@ def translate_agent_response(
             response.status == "success"
             and state["critique"] is not None
             and state["critique"].decision == "revise"
+            and not (source == "planner" and is_preprocessing_repair(state["critique"]))
         ):
             # Mixed feedback must still reach downstream Interpretation.
             updates["critique"] = state["critique"]

@@ -25,6 +25,7 @@ from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import AgentState
 from backend.app.tools.registry import ToolRegistry
 
+from .preprocessing_repair import repair_critique
 from .responses import AgentStateUpdate, translate_agent_response
 from .routes import critique_error
 
@@ -59,7 +60,11 @@ def preprocessing_graph_node(state: AgentState) -> AgentStateUpdate:
             updates=PreprocessingUpdates(),
             error=diagnostic,
         )
-    return translate_agent_response(state, response)
+    updates = translate_agent_response(state, response)
+    feedback = repair_critique(response.error)
+    if feedback is not None:
+        updates["critique"] = feedback
+    return updates
 
 
 def analysis_graph_node(state: AgentState, registry: ToolRegistry) -> AgentStateUpdate:

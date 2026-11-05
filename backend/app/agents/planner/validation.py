@@ -1,6 +1,7 @@
 """Validation for plans produced by the Planner Agent."""
 
 from backend.app.contracts.models import DatasetReference, Plan, PlanStep
+from backend.app.core.exceptions import PlanningClarificationRequired
 from backend.app.tools.analysis.derived import (
     VISUALIZATION_TOOL_NAMES,
     group_aggregate_schema,
@@ -23,6 +24,7 @@ def validate_plan(
     _validate_required_columns(plan, dataset)
     _validate_unique_step_ids(plan)
     _validate_dependencies(plan)
+    _validate_single_active_dataset(plan)
     processed_dataset = _validate_preprocessing_steps(plan, dataset, registry)
     _validate_analysis_steps(plan, processed_dataset, registry)
 
@@ -58,6 +60,28 @@ def _validate_dependencies(plan: Plan) -> None:
                 f"{', '.join(sorted(unavailable))}"
             )
     order_steps([*plan.preprocessing_steps, *plan.analysis_steps])
+
+
+def _validate_single_active_dataset(plan: Plan) -> None:
+    """Reject plans that treat linear preprocessing as branching datasets."""
+    filter_step_ids = {
+        step.step_id
+        for step in plan.preprocessing_steps
+        if step.tool_name == "filter_rows"
+    }
+    referenced_filters = {
+        dependency
+        for step in plan.analysis_steps
+        for dependency in step.depends_on
+        if dependency in filter_step_ids
+    }
+    if len(referenced_filters) > 1:
+        raise PlanningClarificationRequired(
+            "Analysis steps reference multiple filtered preprocessing outputs, but "
+            "preprocessing produces one active dataset.",
+            "This workflow can analyze one independently filtered group at a time. "
+            "Which group should be analyzed first?",
+        )
 
 
 def _validate_analysis_steps(

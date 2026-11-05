@@ -10,9 +10,9 @@ export function FollowUpQuestions({ questions, onSelect }: FollowUpQuestionsProp
   return (
     <div className="mt-6" role="group" aria-label="Follow-up questions">
       <h3 className="text-lg font-semibold leading-7 tracking-tight">Explore further</h3>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-2 flex min-w-0 flex-wrap gap-2">
         {questions.map((question) => (
-          <Button key={question} className="h-auto whitespace-normal rounded-full text-left" onClick={() => onSelect(question)} size="sm" variant="outline">
+          <Button key={question} className="h-auto max-w-full min-w-0 shrink whitespace-normal break-words rounded-full text-left" onClick={() => onSelect(question)} size="sm" variant="outline">
             {question}
           </Button>
         ))}

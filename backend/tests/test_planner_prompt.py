@@ -23,3 +23,18 @@ def test_prompt_requires_a_fitting_chart_except_for_cleaning_only():
     assert "only cleans the data" in prompt
     assert "no analysis steps" in prompt
     assert "must not add a chart" in prompt
+
+
+def test_prompt_explains_that_preprocessing_does_not_branch():
+    prompt = PROMPT_PATH.read_text(encoding="utf-8")
+
+    assert "Preprocessing is linear and produces one active dataset" in prompt
+    assert "intermediate dataset version" in prompt
+    assert "analyze first" in prompt
+
+
+def test_prompt_uses_correlation_for_numeric_relationships():
+    prompt = PROMPT_PATH.read_text(encoding="utf-8")
+
+    assert "Use `correlation_analysis`" in prompt
+    assert "artifact alone is not numerical evidence" in prompt

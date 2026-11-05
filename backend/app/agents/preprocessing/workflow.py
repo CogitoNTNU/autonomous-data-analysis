@@ -23,6 +23,7 @@ from backend.app.models.results import PreprocessingReport
 from backend.app.storage.datasets import create_dataset_reference
 from backend.app.tools.preprocessing_tools import build_metadata, load_csv
 
+from .errors import PreprocessingStepError
 from .node import run_preprocessing
 from .schemas import PreprocessingInput
 
@@ -117,6 +118,8 @@ def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]
             state["dataset"],
             plan.preprocessing_steps,
         )
+    except PreprocessingStepError as error:
+        return _step_error(error)
     except FileNotFoundError:
         return _preprocessing_error(
             "INVALID_DATA", "The registered dataset is unavailable."
@@ -137,6 +140,27 @@ def preprocessing_node(state: AgentState) -> AgentResponse[PreprocessingUpdates]
             preprocessing_report=report,
         ),
         warnings=report.warnings,
+    )
+
+
+def _step_error(error: PreprocessingStepError) -> AgentResponse[PreprocessingUpdates]:
+    details = {
+        **error.details,
+        "reason": error.details.get("reason", "tool_rejected_data"),
+        "tool_name": error.tool_name,
+        "repair_target": "planner",
+    }
+    return AgentResponse[PreprocessingUpdates](
+        status="error",
+        updates=PreprocessingUpdates(),
+        error=AgentError(
+            code="INVALID_DATA",
+            message=f"Preprocessing step '{error.step_id}' rejected the dataset.",
+            source=PREPROCESSING_SOURCE,
+            step_id=error.step_id,
+            retryable=False,
+            details=details,
+        ),
     )
 
 

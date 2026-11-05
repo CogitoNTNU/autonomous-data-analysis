@@ -81,26 +81,7 @@ def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnap
                 "warnings": [warning.message for warning in state["warnings"]],
             }
         )
-    # Diagnostic details can contain provider output and filesystem locations.
-    public_error = (
-        error.model_copy(
-            update={
-                "details": {},
-                "message": f"The {error.source} stage failed ({error.code}).",
-            }
-        )
-        if error
-        else None
-    )
-    if error and error.code == "TIMEOUT":
-        public_error = error.model_copy(
-            update={
-                "details": {},
-                "message": f"The model service did not respond in time during {error.source}. Please try again.",
-            }
-        )
-    if error and error.source == "harness":
-        public_error = error.model_copy(update={"details": {}})
+    public_error = _public_error(error)
     return WorkflowSnapshot(
         run_id=state["run_id"],
         checkpoint_id=snapshot.config["configurable"]["checkpoint_id"],
@@ -117,4 +98,47 @@ def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnap
         dialogue=state.get("dialogue", []),
         analysis_round=state.get("analysis_round", 1),
         accepts_messages=not running and "message" in interrupt_kinds(snapshot),
+    )
+
+
+def _public_error(error: AgentError | None) -> AgentError | None:
+    """Project safe diagnostics while retaining actionable conversion context."""
+    if error is None:
+        return None
+    # Harness messages are authored locally and contain no provider diagnostics.
+    if error.source == "harness":
+        return error.model_copy(update={"details": {}})
+    if error.code == "TIMEOUT":
+        return error.model_copy(
+            update={
+                "details": {},
+                "message": (
+                    "The model service did not respond in time during "
+                    f"{error.source}. Please try again."
+                ),
+            }
+        )
+    column = error.details.get("column")
+    target_type = error.details.get("target_type")
+    if (
+        error.source == "preprocessing"
+        and error.details.get("reason") == "invalid_value"
+        and isinstance(column, str)
+        and isinstance(target_type, str)
+    ):
+        return error.model_copy(
+            update={
+                "details": {},
+                "message": (
+                    f"Preprocessing could not convert values in '{column}' "
+                    f"to {target_type}."
+                ),
+            }
+        )
+    # Other diagnostics can contain provider output and filesystem locations.
+    return error.model_copy(
+        update={
+            "details": {},
+            "message": f"The {error.source} stage failed ({error.code}).",
+        }
     )

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ChatAnswerCard } from "@/features/analysis-chat/ChatAnswerCard";
 import type { AnalysisFigure, ChatAnswer } from "@/types/planner";
@@ -41,5 +41,22 @@ describe("ChatAnswerCard", () => {
     expect(screen.getByText("Finding 4")).toBeVisible();
     await user.click(screen.getByText("Follow-up questions"));
     expect(screen.getByText("Which island?")).toBeVisible();
+  });
+
+  it("offers useful follow-ups when the answer has no specific suggestions", async () => {
+    const user = userEvent.setup();
+    const onFollowUp = vi.fn();
+
+    render(
+      <ChatAnswerCard
+        answer={{ ...answer, followUps: [] }}
+        figures={[]}
+        onFollowUp={onFollowUp}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Explore further" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Explain the most important finding" }));
+    expect(onFollowUp).toHaveBeenCalledWith("Explain the most important finding");
   });
 });

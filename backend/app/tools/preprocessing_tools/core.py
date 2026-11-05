@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MISSING_VALUES = {"", "na", "n/a", "null", "none", "nan"}
 SUPPORTED_TYPES = {"integer", "float", "string", "boolean", "date", "currency"}
-SupportedType = Literal[
-    "integer", "float", "string", "boolean", "date", "currency"
-]
+SupportedType = Literal["integer", "float", "string", "boolean", "date", "currency"]
 DEFAULT_DATE_FORMATS = [
     "%Y-%m-%d",
     "%d/%m/%Y",
@@ -24,7 +22,7 @@ DEFAULT_DATE_FORMATS = [
     "%d %B %Y",
     "%m/%d/%Y",
 ]
-FILTER_OPERATORS = {
+FilterOperator = Literal[
     "eq",
     "ne",
     "gt",
@@ -38,11 +36,21 @@ FILTER_OPERATORS = {
     "ends_with",
     "is_missing",
     "not_missing",
-}
+]
+FILTER_OPERATORS = frozenset(get_args(FilterOperator))
 
 
 class PreprocessingToolError(ValueError):
     """Raised when a registered CSV transformation cannot execute."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        details: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.details = dict(details or {})
 
 
 @dataclass(frozen=True)
@@ -62,7 +70,9 @@ class ToolArguments(BaseModel):
 
 class MissingValuesArguments(ToolArguments):
     columns: list[str] | None = None
-    strategy: Literal["drop_rows", "mean", "median", "mode", "constant", "fill"] = "drop_rows"
+    strategy: Literal["drop_rows", "mean", "median", "mode", "constant", "fill"] = (
+        "drop_rows"
+    )
     constant_value: Any = None
     value: Any = None
 
@@ -152,13 +162,15 @@ class ScaleFeaturesArguments(ToolArguments):
 
 class FilterCondition(ToolArguments):
     column: str
-    operator: str
+    operator: FilterOperator = Field(
+        description=(
+            "Use lt for <, lte for <=, gt for >, gte for >=, eq for ==, and ne for !=."
+        )
+    )
     value: Any = None
 
     @model_validator(mode="after")
     def validate_operator_and_value(self):
-        if self.operator not in FILTER_OPERATORS:
-            raise ValueError(f"Unsupported filter operator: {self.operator}")
         if self.operator in {"is_missing", "not_missing"} and self.value is not None:
             raise ValueError(f"{self.operator} does not take a value")
         if self.operator not in {"is_missing", "not_missing"} and self.value is None:

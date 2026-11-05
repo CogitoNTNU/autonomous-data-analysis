@@ -13,6 +13,8 @@ from backend.app.contracts.models import (
 from backend.app.contracts.responses import AgentResponse, ResponseStatus
 from backend.app.contracts.state import AgentState
 
+from .preprocessing_repair import is_preprocessing_repair
+
 UpdatesT = TypeVar("UpdatesT", bound=ContractModel)
 
 
@@ -47,8 +49,13 @@ def outcome_updates(
         and state["last_node_error"].retryable
     )
     critique = state["critique"]
+    revision_source = previous.current_agent == "critic" or (
+        previous.current_agent == "preprocessing"
+        and agent == "planner"
+        and is_preprocessing_repair(critique)
+    )
     revision = (
-        previous.current_agent == "critic"
+        revision_source
         and agent in {"planner", "preprocessing", "analysis", "interpretation"}
         and critique is not None
         and critique.decision == "revise"

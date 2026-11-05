@@ -17,6 +17,7 @@ from backend.app.contracts.models import (
     PlanStep,
 )
 from backend.app.contracts.responses import AgentResponse
+from backend.app.core.exceptions import PlanningClarificationRequired
 from backend.app.tools.registry import ToolRegistry, canonical_tool_name
 
 SOURCE = "planner"
@@ -79,6 +80,12 @@ def run_planner(
 
     try:
         validate_plan(plan, dataset, registry)
+    except PlanningClarificationRequired as exc:
+        return AgentResponse(
+            status="needs_clarification",
+            updates=PlannerUpdates(),
+            clarification_question=exc.question,
+        )
     except ValueError as exc:
         return _invalid_output(str(exc))
 

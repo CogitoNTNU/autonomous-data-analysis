@@ -83,7 +83,12 @@ def build_graph(
     builder.add_conditional_edges(
         "preprocessing",
         route_after_preprocessing,
-        {"preprocessing": "preprocessing", "analysis": "analysis", "end": "finish_run"},
+        {
+            "planner": "planner",
+            "preprocessing": "preprocessing",
+            "analysis": "analysis",
+            "end": "finish_run",
+        },
     )
     builder.add_conditional_edges(
         "analysis",

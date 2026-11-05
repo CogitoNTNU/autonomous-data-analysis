@@ -13,6 +13,7 @@ from backend.app.contracts.models import (
     PreprocessingReport,
 )
 from backend.app.contracts.state import AgentState, create_initial_state
+from backend.app.graph.preprocessing_repair import repair_critique
 from backend.app.graph.routes import route_after_analysis, route_after_preprocessing
 
 
@@ -70,6 +71,47 @@ def test_route_after_preprocessing_stops_on_error(ready_state):
         )
     ]
     ready_state["last_node_error"] = ready_state["errors"][-1]
+
+    assert route_after_preprocessing(ready_state) == "end"
+
+
+def test_route_after_preprocessing_sends_plan_caused_failure_to_planner(ready_state):
+    error = AgentError(
+        code="INVALID_DATA",
+        message="Conversion failed.",
+        source="preprocessing",
+        step_id="convert-price",
+        details={
+            "repair_target": "planner",
+            "tool_name": "change_datatypes",
+            "column": "unit_price",
+            "target_type": "float",
+        },
+    )
+    ready_state["errors"] = [error]
+    ready_state["last_node_error"] = error
+    ready_state["critique"] = repair_critique(error)
+
+    assert route_after_preprocessing(ready_state) == "planner"
+
+
+def test_route_after_preprocessing_stops_replanning_at_revision_limit(ready_state):
+    error = AgentError(
+        code="INVALID_DATA",
+        message="Conversion failed.",
+        source="preprocessing",
+        step_id="convert-price",
+        details={
+            "repair_target": "planner",
+            "tool_name": "change_datatypes",
+        },
+    )
+    ready_state["errors"] = [error]
+    ready_state["last_node_error"] = error
+    ready_state["critique"] = repair_critique(error)
+    ready_state["control"] = ready_state["control"].model_copy(
+        update={"revision_count": 2, "max_revisions": 2}
+    )
 
     assert route_after_preprocessing(ready_state) == "end"
 

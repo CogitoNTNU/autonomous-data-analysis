@@ -65,6 +65,7 @@ def default_registry() -> ToolRegistry:
     from backend.app.tools.analysis.categorical import (
         TOOL as CATEGORICAL_ANALYSIS_TOOL,
     )
+    from backend.app.tools.analysis.correlation import TOOL as CORRELATION_TOOL
     from backend.app.tools.analysis.group_aggregate import (
         TOOL as GROUP_AGGREGATE_TOOL,
     )
@@ -72,6 +73,7 @@ def default_registry() -> ToolRegistry:
 
     registry = ToolRegistry()
     registry.register(TOOL)
+    registry.register(CORRELATION_TOOL)
     registry.register(GROUP_AGGREGATE_TOOL)
     registry.register(CATEGORICAL_ANALYSIS_TOOL)
     register_visualization(registry)

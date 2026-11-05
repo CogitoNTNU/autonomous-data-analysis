@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import unicodedata
 from collections import Counter
 from datetime import datetime
@@ -26,7 +25,9 @@ def handle_missing_values(
     strategy = arguments.get("strategy", "drop_rows")
     if columns is None:
         columns = list(fieldnames or (rows[0] if rows else []))
-    if not isinstance(columns, list) or not all(isinstance(column, str) for column in columns):
+    if not isinstance(columns, list) or not all(
+        isinstance(column, str) for column in columns
+    ):
         raise PreprocessingToolError("columns must be a list of strings")
     require_columns(rows, columns, fieldnames)
 
@@ -34,7 +35,9 @@ def handle_missing_values(
         kept_rows = [
             row
             for row in rows
-            if not any(row[column].strip().lower() in MISSING_VALUES for column in columns)
+            if not any(
+                row[column].strip().lower() in MISSING_VALUES for column in columns
+            )
         ]
         return ToolExecution(
             kept_rows,
@@ -85,7 +88,10 @@ def handle_missing_values(
         updated = row.copy()
         row_changed = False
         for column in columns:
-            if updated[column].strip().lower() in MISSING_VALUES and column in fill_values:
+            if (
+                updated[column].strip().lower() in MISSING_VALUES
+                and column in fill_values
+            ):
                 updated[column] = fill_values[column]
                 row_changed = True
         changed_rows += row_changed
@@ -129,7 +135,11 @@ def parse_numeric_value(value: str) -> float:
             normalized = normalized.replace(",", ".")
     elif dot >= 0 and normalized.count(".") > 1:
         parts = normalized.split(".")
-        normalized = "".join(parts) if len(parts[-1]) == 3 else "".join(parts[:-1]) + "." + parts[-1]
+        normalized = (
+            "".join(parts)
+            if len(parts[-1]) == 3
+            else "".join(parts[:-1]) + "." + parts[-1]
+        )
     elif dot >= 0 and len(normalized) - dot - 1 == 3:
         normalized = normalized.replace(".", "")
 
@@ -185,11 +195,15 @@ def change_datatypes(
     if conversions is None:
         conversions = {arguments["column"]: arguments["target_type"]}
     if not isinstance(conversions, dict) or not conversions:
-        raise PreprocessingToolError("conversions must be a non-empty column-to-type mapping")
+        raise PreprocessingToolError(
+            "conversions must be a non-empty column-to-type mapping"
+        )
     require_columns(rows, list(conversions), fieldnames)
     invalid_types = sorted(set(conversions.values()) - SUPPORTED_TYPES)
     if invalid_types:
-        raise PreprocessingToolError(f"Unsupported target types: {', '.join(invalid_types)}")
+        raise PreprocessingToolError(
+            f"Unsupported target types: {', '.join(invalid_types)}"
+        )
 
     invalid_strategy = arguments.get("invalid_value_strategy", "error")
     converted_rows = []
@@ -208,7 +222,13 @@ def change_datatypes(
             except (ValueError, OverflowError) as error:
                 if invalid_strategy == "error":
                     raise PreprocessingToolError(
-                        f"Cannot convert column '{column}' value on CSV row {row_number} to {target_type}"
+                        f"Cannot convert column '{column}' value on CSV row {row_number} to {target_type}",
+                        details={
+                            "reason": "invalid_value",
+                            "column": column,
+                            "target_type": target_type,
+                            "row_number": row_number,
+                        },
                     ) from error
                 invalid_count += 1
                 if invalid_strategy == "drop":
@@ -223,7 +243,9 @@ def change_datatypes(
 
     warnings = []
     if invalid_count and invalid_strategy != "error":
-        warnings.append(f"{invalid_count} invalid value(s) handled using '{invalid_strategy}'")
+        warnings.append(
+            f"{invalid_count} invalid value(s) handled using '{invalid_strategy}'"
+        )
     return ToolExecution(
         converted_rows,
         list(conversions),

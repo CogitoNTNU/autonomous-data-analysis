@@ -7,6 +7,7 @@ from backend.app.contracts.models import Critique, RunControl
 from backend.app.contracts.state import AgentState
 
 from .limits import can_retry
+from .preprocessing_repair import is_preprocessing_repair, is_repairable_failure
 
 RevisionTarget = Literal["planner", "preprocessing", "analysis", "interpretation"]
 REVISION_ORDER: tuple[RevisionTarget, ...] = (
@@ -45,9 +46,15 @@ def route_after_planner(
 
 def route_after_preprocessing(
     state: AgentState,
-) -> Literal["preprocessing", "analysis", "end"]:
+) -> Literal["planner", "preprocessing", "analysis", "end"]:
     if can_retry(state["last_node_error"], state["control"]):
         return "preprocessing"
+    if (
+        is_repairable_failure(state["last_node_error"])
+        and is_preprocessing_repair(state["critique"])
+        and state["control"].revision_count < state["control"].max_revisions
+    ):
+        return "planner"
     if _blocked(state):
         return "end"
     if (

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from backend.app.agents.analysis import analysis_node
 from backend.app.agents.planner.agent import run_planner
 from backend.app.agents.planner.schema import PlannerOutput
@@ -108,3 +110,43 @@ def test_change_datatypes_normalizes_datetime_to_supported_date_type():
     arguments = ChangeDatatypesArguments(conversions={"signup date": "datetime"})
 
     assert arguments.conversions == {"signup date": "date"}
+
+
+def test_preprocessing_node_identifies_the_step_that_rejected_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("backend.app.storage.datasets.ALLOWED", (tmp_path,))
+    path = tmp_path / "dirty.csv"
+    path.write_text(
+        "transaction_id,unit_price,date\nTX-1,not_available,2025-01-01\n",
+        encoding="utf-8",
+    )
+    dataset = create_dataset_reference(path)
+    state = create_initial_state("Summarize profit", dataset)
+    state["plan"] = Plan(
+        plan_id="bad-conversion",
+        objective="Summarize profit.",
+        preprocessing_steps=[
+            PlanStep(
+                step_id="convert-price",
+                tool_name="change_datatypes",
+                arguments={"conversions": {"unit_price": "float", "date": "date"}},
+            )
+        ],
+    )
+
+    response = preprocessing_node(state)
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert response.error.code == "INVALID_DATA"
+    assert response.error.step_id == "convert-price"
+    assert response.error.details == {
+        "reason": "invalid_value",
+        "column": "unit_price",
+        "target_type": "float",
+        "row_number": 2,
+        "tool_name": "change_datatypes",
+        "repair_target": "planner",
+    }
+    assert "not_available" not in response.model_dump_json()

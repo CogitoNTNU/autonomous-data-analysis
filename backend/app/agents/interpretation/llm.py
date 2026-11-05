@@ -1,8 +1,7 @@
-"""OpenAI-compatible Chat Completions adapter; requires JSON-object mode."""
+"""OpenAI-compatible Chat Completions adapter using structured output."""
 
-import json
 from math import isfinite
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from openai import (
     APIConnectionError,
@@ -29,7 +28,7 @@ class InterpretationLLM:
 
     The caller owns the client's lifetime. SDK retries are disabled on a copy;
     timeout_seconds is an HTTP operation timeout, not a workflow deadline.
-    JSON mode is requested explicitly with no capability fallback or tools.
+    Strict JSON Schema output is requested with no capability fallback or tools.
     """
 
     def __init__(
@@ -57,18 +56,14 @@ class InterpretationLLM:
         if not prompt.strip():
             raise ValueError("An interpretation prompt is required")
         content = serialize_context(context)
-        schema = json.dumps(Interpretation.model_json_schema())
         try:
             completion = self._client.chat.completions.create(
                 model=self._model_name,
                 messages=[
-                    {
-                        "role": "system",
-                        "content": f"{prompt}\n\nReturn JSON matching this schema:\n{schema}",
-                    },
+                    {"role": "system", "content": prompt},
                     {"role": "user", "content": content},
                 ],
-                response_format={"type": "json_object"},
+                response_format=_response_format(context),
                 **self._completion.request_kwargs(),
             )
         except APITimeoutError as error:
@@ -113,6 +108,25 @@ def _parse_completion(completion: ChatCompletion) -> Interpretation:
     if message.content is None:
         raise ValueError("The interpretation model returned no content")
     return InterpretationLLM.parse_output(message.content)
+
+
+def _response_format(context: InterpretationContext) -> dict[str, Any]:
+    """Return a strict schema limited to citations available in this context."""
+    schema = Interpretation.model_json_schema()
+    result_ids = [result.result_id for result in context.evidence.results]
+    if result_ids:
+        references = schema["$defs"]["Finding"]["properties"]["result_ids"]
+        references["items"] = {"type": "string", "enum": result_ids}
+    else:
+        schema["properties"]["findings"]["maxItems"] = 0
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "interpretation",
+            "strict": True,
+            "schema": schema,
+        },
+    }
 
 
 def _raise_status_error(error: APIStatusError) -> NoReturn:

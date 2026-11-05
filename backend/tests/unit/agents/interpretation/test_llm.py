@@ -10,6 +10,7 @@ from backend.app.agents.interpretation.llm import InterpretationLLM
 from backend.app.agents.interpretation.schema import (
     InterpretationContext,
     InterpretationEvidence,
+    ResultEvidence,
 )
 from backend.app.contracts.models import Interpretation
 from backend.app.core.exceptions import ModelProviderError
@@ -22,7 +23,19 @@ def context() -> InterpretationContext:
         objective="Summarize age",
         assumptions=[],
         expected_outputs=[],
-        evidence=InterpretationEvidence(),
+        evidence=InterpretationEvidence(
+            results=[
+                ResultEvidence(
+                    result_id="r1",
+                    step_id="s1",
+                    dataset_version="v1",
+                    method="descriptive_statistics",
+                    parameters={"columns": ["age"]},
+                    values={"status": "ok"},
+                    sample_size=3,
+                )
+            ]
+        ),
         artifacts=[],
     )
 
@@ -67,7 +80,7 @@ def client_factory():
         client.close()
 
 
-def test_sends_one_json_request_with_schema_context_and_no_tools(
+def test_sends_one_strict_schema_request_with_grounded_citations_and_no_tools(
     client_factory, completion, context
 ):
     requests = []
@@ -88,14 +101,36 @@ def test_sends_one_json_request_with_schema_context_and_no_tools(
     payload = json.loads(request.content)
     assert request.url.path == "/v1/chat/completions"
     assert payload["model"] == "test-model"
-    assert payload["response_format"] == {"type": "json_object"}
+    response_format = payload["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["name"] == "interpretation"
+    assert response_format["json_schema"]["strict"] is True
+    result_ids = response_format["json_schema"]["schema"]["$defs"]["Finding"][
+        "properties"
+    ]["result_ids"]
+    assert result_ids["items"]["enum"] == ["r1"]
     assert "tools" not in payload
     assert payload["messages"][0]["role"] == "system"
-    assert '"result_ids"' in payload["messages"][0]["content"]
     assert json.loads(payload["messages"][1]["content"]) == before
     assert request.extensions["timeout"]["read"] == 7
     assert context.model_dump() == before
     assert client.max_retries == 2
+
+
+def test_schema_disallows_findings_when_context_has_no_usable_results(
+    client_factory, completion, context
+):
+    sent = []
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx2.Response(200, json=completion)
+
+    context.evidence.results = []
+    InterpretationLLM(client_factory(handler), "test-model")("Interpret.", context)
+
+    schema = sent[0]["response_format"]["json_schema"]["schema"]
+    assert schema["properties"]["findings"]["maxItems"] == 0
 
 
 @pytest.mark.parametrize(

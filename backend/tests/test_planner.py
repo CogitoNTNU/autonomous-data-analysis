@@ -1,5 +1,6 @@
 from backend.app.agents.planner.agent import run_planner
 from backend.app.agents.planner.schema import PlannerOutput
+from backend.app.agents.preprocessing import register_preprocessing_tools
 from backend.app.contracts.models import (
     DatasetReference,
     Plan,
@@ -111,6 +112,116 @@ def test_planner_rejects_invalid_plan():
     assert response.status == "error"
     assert response.error is not None
     assert response.error.code == "INVALID_OUTPUT"
+
+
+def test_planner_requests_clarification_for_independent_filtered_groups():
+    plan = make_valid_plan().model_copy(
+        update={
+            "preprocessing_steps": [
+                PlanStep(
+                    step_id="negative-quantity",
+                    tool_name="filter_rows",
+                    arguments={
+                        "conditions": [
+                            {"column": "body_mass_g", "operator": "lt", "value": 0}
+                        ]
+                    },
+                ),
+                PlanStep(
+                    step_id="very-heavy",
+                    tool_name="filter_rows",
+                    arguments={
+                        "conditions": [
+                            {
+                                "column": "body_mass_g",
+                                "operator": "gt",
+                                "value": 10_000,
+                            }
+                        ]
+                    },
+                ),
+            ],
+            "analysis_steps": [
+                PlanStep(
+                    step_id="summarize-negative",
+                    tool_name="descriptive_statistics",
+                    arguments={"columns": ["body_mass_g"]},
+                    depends_on=["negative-quantity"],
+                ),
+                PlanStep(
+                    step_id="summarize-heavy",
+                    tool_name="descriptive_statistics",
+                    arguments={"columns": ["body_mass_g"]},
+                    depends_on=["very-heavy"],
+                ),
+            ],
+        }
+    )
+
+    response = run_planner(
+        user_query="Compare two independently filtered groups.",
+        dataset=make_dataset(),
+        conversation_context=[],
+        critique=None,
+        registry=register_preprocessing_tools(default_registry()),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "needs_clarification"
+    assert response.error is None
+    assert response.clarification_question is not None
+    assert "one independently filtered group at a time" in (
+        response.clarification_question
+    )
+
+
+def test_planner_accepts_sequential_filters_for_one_final_cohort():
+    plan = make_valid_plan().model_copy(
+        update={
+            "preprocessing_steps": [
+                PlanStep(
+                    step_id="positive-mass",
+                    tool_name="filter_rows",
+                    arguments={
+                        "conditions": [
+                            {"column": "body_mass_g", "operator": "gt", "value": 0}
+                        ]
+                    },
+                ),
+                PlanStep(
+                    step_id="bounded-mass",
+                    tool_name="filter_rows",
+                    arguments={
+                        "conditions": [
+                            {
+                                "column": "body_mass_g",
+                                "operator": "lt",
+                                "value": 10_000,
+                            }
+                        ]
+                    },
+                    depends_on=["positive-mass"],
+                ),
+            ],
+            "analysis_steps": [
+                make_valid_plan()
+                .analysis_steps[0]
+                .model_copy(update={"depends_on": ["bounded-mass"]})
+            ],
+        }
+    )
+
+    response = run_planner(
+        user_query="Compare species after applying both filters.",
+        dataset=make_dataset(),
+        conversation_context=[],
+        critique=None,
+        registry=register_preprocessing_tools(default_registry()),
+        model=lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "success"
+    assert response.updates.plan == plan
 
 
 def test_planner_accepts_chart_of_group_aggregate_output():

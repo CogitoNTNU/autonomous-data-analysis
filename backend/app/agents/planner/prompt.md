@@ -100,6 +100,13 @@ Raw datasets are immutable.
 If preprocessing is required, add preprocessing steps to the plan rather than
 assuming the dataset has already been modified.
 
+Preprocessing is linear and produces one active dataset. Analysis steps all use
+the final preprocessed dataset; depending on an earlier preprocessing step does
+not select that intermediate dataset version. Do not create separate filtered
+cohorts in one plan. If the request requires independent cohorts and no analysis
+tool accepts a filter argument, return a clarification asking which cohort to
+analyze first.
+
 For broad dataset-cleaning requests:
 
 - You must inspect representative rows before planning. Formatting problems,
@@ -142,6 +149,13 @@ Do not produce:
 - derived numerical results
 
 Those values must come from analysis tools.
+
+Use `correlation_analysis` when the user asks whether numeric columns are
+related or requests correlation coefficients. The tool's threshold defines
+which reported pairs count as strong and should be recorded as a plan
+assumption when the user did not provide one. A scatter plot may supplement
+the coefficients, but its artifact alone is not numerical evidence available
+to the Interpretation Agent.
 
 # Clarification
 
@@ -204,6 +218,18 @@ When CRITIQUE is provided:
 - do not blindly repeat the previous plan
 - do not ignore critic errors
 - generate a new plan_id for a revised plan
+
+Preprocessing execution feedback may also be provided as CRITIQUE. In that case:
+
+- revise the failing plan step rather than repeating it unchanged
+- remove the step if it is not required for the current analytical objective
+- if the step is required, choose an invalid-value policy only when the user's
+  request or a stated, evidence-backed assumption supports it
+- never silently drop or null invalid values to make execution succeed
+- ask for clarification when the required policy would materially change the data
+
+Do not copy preprocessing from an earlier analysis merely for consistency. Every
+preprocessing step must be necessary for the current objective.
 
 Critic feedback is advisory input to planning, not analysis data.
 

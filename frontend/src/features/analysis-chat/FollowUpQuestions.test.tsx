@@ -19,4 +19,18 @@ describe("FollowUpQuestions", () => {
     const { container } = render(<FollowUpQuestions questions={[]} onSelect={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("constrains a long suggestion to the available width", () => {
+    const question = `Compare ${"revenue".repeat(30)} across regions`;
+
+    render(<FollowUpQuestions questions={[question]} onSelect={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: question })).toHaveClass(
+      "max-w-full",
+      "min-w-0",
+      "shrink",
+      "whitespace-normal",
+      "break-words",
+    );
+  });
 });

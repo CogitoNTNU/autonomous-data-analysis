@@ -16,6 +16,7 @@ from backend.app.agents.preprocessing import (
 )
 from backend.app.models.dataset import DatasetMetadata, DatasetReference
 from backend.app.models.plan import PlanStep
+from backend.app.tools.preprocessing_tools import FILTER_OPERATORS, FilterCondition
 
 
 @pytest.fixture
@@ -56,7 +57,9 @@ def _run_step(dataset, tmp_path, csv_text, tool_name, arguments):
         input_dataset,
         [PlanStep(step_id="step", tool_name=tool_name, arguments=arguments)],
     )
-    with Path(result.processed_dataset.uri).open(encoding="utf-8", newline="") as csv_file:
+    with Path(result.processed_dataset.uri).open(
+        encoding="utf-8", newline=""
+    ) as csv_file:
         output_reader = csv.DictReader(csv_file)
         output_headers = output_reader.fieldnames or []
         output_rows = list(output_reader)
@@ -78,10 +81,7 @@ def test_empty_plan_preserves_dataset_and_reports_no_changes(dataset):
 def test_preprocessing_tools_create_a_versioned_dataset(dataset, tmp_path):
     source = tmp_path / "input.csv"
     source.write_text(
-        "name,score,group\n"
-        "a,1,A\n"
-        "b,NA,B\n"
-        "b,NA,B\n",
+        "name,score,group\na,1,A\nb,NA,B\nb,NA,B\n",
         encoding="utf-8",
     )
     input_dataset = dataset.model_copy(
@@ -121,10 +121,7 @@ def test_preprocessing_tools_create_a_versioned_dataset(dataset, tmp_path):
         "remove_duplicates",
     ]
     assert source.read_text(encoding="utf-8") == (
-        "name,score,group\n"
-        "a,1,A\n"
-        "b,NA,B\n"
-        "b,NA,B\n"
+        "name,score,group\na,1,A\nb,NA,B\nb,NA,B\n"
     )
 
 
@@ -147,7 +144,9 @@ def test_node_accepts_typed_input_and_returns_typed_output(dataset):
 
 def test_idun_plan_is_validated_and_can_be_run_locally(dataset, tmp_path):
     source = tmp_path / "input.csv"
-    source.write_text("score,private_value\nNA,do-not-send\n2,also-private\n", encoding="utf-8")
+    source.write_text(
+        "score,private_value\nNA,do-not-send\n2,also-private\n", encoding="utf-8"
+    )
     input_dataset = dataset.model_copy(
         update={
             "uri": str(source),
@@ -216,7 +215,11 @@ def test_idun_plan_is_validated_and_can_be_run_locally(dataset, tmp_path):
             "handle_missing_values",
             {"columns": ["score"], "strategy": "mean"},
             ["score", "group"],
-            [{"score": "1", "group": "A"}, {"score": "2", "group": "A"}, {"score": "3", "group": "B"}],
+            [
+                {"score": "1", "group": "A"},
+                {"score": "2", "group": "A"},
+                {"score": "3", "group": "B"},
+            ],
         ),
         (
             "score,group\n1,A\nNA,A\n3,B\n",
@@ -353,7 +356,9 @@ def test_normalize_values_and_locale_aware_conversions(dataset, tmp_path):
 
     result = PreprocessingAgent().run(input_dataset, steps)
 
-    with Path(result.processed_dataset.uri).open(encoding="utf-8", newline="") as csv_file:
+    with Path(result.processed_dataset.uri).open(
+        encoding="utf-8", newline=""
+    ) as csv_file:
         rows = list(csv.DictReader(csv_file))
     assert rows == [
         {
@@ -448,7 +453,9 @@ def test_preprocessing_steps_run_after_their_dependencies(dataset, tmp_path):
 
     result = PreprocessingAgent().run(input_dataset, steps)
 
-    with Path(result.processed_dataset.uri).open(encoding="utf-8", newline="") as csv_file:
+    with Path(result.processed_dataset.uri).open(
+        encoding="utf-8", newline=""
+    ) as csv_file:
         reader = csv.DictReader(csv_file)
         assert reader.fieldnames == ["label"]
         assert list(reader) == [{"label": "b"}, {"label": "c"}]
@@ -462,7 +469,13 @@ def test_preprocessing_steps_run_after_their_dependencies(dataset, tmp_path):
     ("steps", "message"),
     [
         (
-            [PlanStep(step_id="same", tool_name="select_columns", arguments={"columns": ["x"]})]
+            [
+                PlanStep(
+                    step_id="same",
+                    tool_name="select_columns",
+                    arguments={"columns": ["x"]},
+                )
+            ]
             * 2,
             "must be unique",
         ),
@@ -479,8 +492,18 @@ def test_preprocessing_steps_run_after_their_dependencies(dataset, tmp_path):
         ),
         (
             [
-                PlanStep(step_id="one", tool_name="select_columns", arguments={"columns": ["x"]}, depends_on=["two"]),
-                PlanStep(step_id="two", tool_name="select_columns", arguments={"columns": ["x"]}, depends_on=["one"]),
+                PlanStep(
+                    step_id="one",
+                    tool_name="select_columns",
+                    arguments={"columns": ["x"]},
+                    depends_on=["two"],
+                ),
+                PlanStep(
+                    step_id="two",
+                    tool_name="select_columns",
+                    arguments={"columns": ["x"]},
+                    depends_on=["one"],
+                ),
             ],
             "dependency cycle",
         ),
@@ -504,11 +527,21 @@ def test_tool_argument_schemas_reject_unsupported_values(dataset, tmp_path):
                     step_id="invalid_filter",
                     tool_name="filter_rows",
                     arguments={
-                        "conditions": [{"column": "value", "operator": "exec", "value": "x"}]
+                        "conditions": [
+                            {"column": "value", "operator": "exec", "value": "x"}
+                        ]
                     },
                 )
             ],
         )
+
+
+def test_filter_condition_schema_publishes_canonical_comparison_operators():
+    operator = FilterCondition.model_json_schema()["properties"]["operator"]
+
+    assert set(operator["enum"]) == FILTER_OPERATORS
+    assert "lt for <" in operator["description"]
+    assert "gt for >" in operator["description"]
 
 
 @pytest.mark.skipif(
@@ -534,9 +567,7 @@ def test_idun_live_plan_and_preprocessing_run(dataset, tmp_path):
     assert all(step.tool_name == "handle_missing_values" for step in steps)
     assert all(step.arguments.get("strategy") == "drop_rows" for step in steps)
     planned_columns = {
-        column
-        for step in steps
-        for column in step.arguments.get("columns", [])
+        column for step in steps for column in step.arguments.get("columns", [])
     }
     assert {"bill_length_mm", "sex"}.issubset(planned_columns)
 

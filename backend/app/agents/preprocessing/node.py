@@ -6,11 +6,13 @@ from ...models.dataset import DatasetReference
 from ...models.plan import PlanStep
 from ...models.results import PreprocessingChange
 from ...tools.preprocessing_tools import (
+    PreprocessingToolError,
     build_metadata,
     execute_preprocessing_tool,
     load_csv,
     write_csv,
 )
+from .errors import PreprocessingStepError
 from .idun import IdunPreprocessingPlanner
 from .schemas import PreprocessingInput, PreprocessingOutput
 
@@ -41,9 +43,12 @@ def run_preprocessing(input_data: PreprocessingInput) -> PreprocessingOutput:
     warnings: list[str] = []
     made_changes = False
     for step in _order_steps(input_data.steps):
-        execution = execute_preprocessing_tool(
-            step.tool_name, rows, fieldnames, step.arguments
-        )
+        try:
+            execution = execute_preprocessing_tool(
+                step.tool_name, rows, fieldnames, step.arguments
+            )
+        except PreprocessingToolError as error:
+            raise PreprocessingStepError(step.step_id, step.tool_name, error) from error
         rows = execution.rows
         if execution.fieldnames is not None:
             fieldnames = execution.fieldnames

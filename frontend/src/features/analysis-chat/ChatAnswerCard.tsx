@@ -6,6 +6,12 @@ import { FollowUpQuestions } from "@/features/analysis-chat/FollowUpQuestions";
 import { TextList } from "@/features/analysis-chat/TextList";
 import type { AnalysisFigure, AnalysisTable, ChatAnswer } from "@/types/planner";
 
+const fallbackFollowUps = [
+  "Explain the most important finding",
+  "Which limitations matter most?",
+  "What should I analyze next?",
+];
+
 export function ChatAnswerCard({
   answer, figures, tables = [], onFollowUp,
 }: {
@@ -18,6 +24,8 @@ export function ChatAnswerCard({
   const findings = unique(answer.findings.map((finding) => finding.claim))
     .filter((claim) => normalize(claim) !== summary);
   const notes = unique(answer.limitations);
+  const followUps = unique(answer.followUps);
+  const availableFollowUps = followUps.length > 0 ? followUps : fallbackFollowUps;
   return (
     <AgentTurn agent={agents.assistant}>
       <div aria-label="Analysis answer">
@@ -33,11 +41,11 @@ export function ChatAnswerCard({
         <AnalysisChartGallery figures={figures} figureIds={answer.figureIds} />
         <TextList items={notes} title="Important notes" />
         {onFollowUp ? (
-          <FollowUpQuestions questions={unique(answer.followUps)} onSelect={onFollowUp} />
-        ) : answer.followUps.length > 0 && (
+          <FollowUpQuestions questions={availableFollowUps} onSelect={onFollowUp} />
+        ) : followUps.length > 0 && (
           <details className="mt-4 text-sm text-muted-foreground">
             <summary className="cursor-pointer hover:text-foreground">Follow-up questions</summary>
-            <TextList items={unique(answer.followUps)} title="Explore further" />
+            <TextList items={followUps} title="Explore further" />
           </details>
         )}
       </div>
