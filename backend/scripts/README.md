@@ -1,4 +1,9 @@
-# Critic evaluation
+# Backend scripts
+
+Run commands from the repository root. For live calls, use the root `.env`
+file described in the [running guide](../../RUNNING.md#start-the-local-app).
+
+## Critic evaluation
 
 The 12 cases in `critic_eval_cases.py` use synthetic penguin, sales, and website
 traffic data. Each domain has two approved and two revise cases. Tests compare
@@ -29,7 +34,7 @@ To evaluate against a live model, set `NTNU_LLM_API_KEY` (or `IDUN_API_KEY`).
 You can also set `NTNU_LLM_BASE_URL` and `NTNU_LLM_MODEL`. This command calls the LLM:
 
 ```bash
-uv run --project backend python -m backend.scripts.critic_eval
+uv run --project backend --env-file .env python -m backend.scripts.critic_eval
 ```
 
 Decision accuracy counts only calls that return a valid critique. A false approval
@@ -53,12 +58,12 @@ raw data, preprocessing reports, or artifact contents.
 Run from the repository root with the existing NTNU configuration:
 
 ```bash
-uv run --project backend --env-file backend/.env python -m backend.scripts.graph_llm_smoke
+uv run --project backend --env-file .env python -m backend.scripts.graph_llm_smoke
 ```
 
 `NTNU_LLM_API_KEY` is required. Optional settings are `NTNU_LLM_BASE_URL`,
 `NTNU_LLM_MODEL`, and `NTNU_LLM_TIMEOUT_SECONDS`; defaults come from
-`app/core/llm_config.py`. Omit `--env-file backend/.env` if these variables are
+`app/core/llm_config.py`. Omit `--env-file .env` if these variables are
 already exported. The endpoint may require NTNU network/VPN access.
 
 The default run uses `tests/fixtures/clean.csv` and descriptive statistics for
@@ -71,7 +76,7 @@ configured timeout without SDK retries.
 Run the separate controlled revision scenario with:
 
 ```bash
-uv run --project backend --env-file backend/.env python -m backend.scripts.graph_llm_smoke --controlled-revision
+uv run --project backend --env-file .env python -m backend.scripts.graph_llm_smoke --controlled-revision
 ```
 
 This scenario injects an incorrect first Interpretation claiming a mean of

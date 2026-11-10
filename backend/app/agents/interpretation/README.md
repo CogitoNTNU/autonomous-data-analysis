@@ -30,8 +30,8 @@ from backend.app.agents.interpretation import interpretation_node
 response = interpretation_node(state, model)
 ```
 
-The future LangGraph harness must consume this typed envelope and apply its
-updates rather than registering it as a dictionary-returning node unchanged.
+The [LangGraph adapter](../../graph/nodes.py) consumes this typed envelope and
+applies its updates through the shared-state merge layer.
 Failures explicitly include `interpretation=None` even when updates are
 serialized with `exclude_unset=True`, so the harness can invalidate an older
 draft. Routing, error history, warning deduplication, and invalidation of old
@@ -39,11 +39,14 @@ Critic approvals or final responses remain the harness's responsibility.
 
 ## Provider adapter
 
-`InterpretationLLM(client, model_name, timeout_seconds=30.0)` implements the
+`InterpretationLLM(client, model_name, timeout_seconds=120.0)` implements the
 model callable using Chat Completions. The configured endpoint and model must
-support `response_format={"type": "json_object"}`. JSON mode does not guarantee
-the application schema; the adapter validates output with Pydantic. It does
-not silently fall back to another endpoint, model, or response format.
+support strict JSON Schema output (`response_format.type="json_schema"`). The
+request restricts finding citations to available result IDs, and the adapter
+validates the response with Pydantic. It does not silently fall back to another endpoint, model, or response format.
+
+The web application supplies the timeout and completion settings described in
+the [backend model settings](../../../README.md#model-latency-and-request-budgets).
 
 The application supplies an `InterpretationInput` and configures credentials
 and an endpoint at startup. For example, with your own environment settings:
@@ -85,5 +88,3 @@ harness must enforce any overall workflow deadline and retry limits.
 The HTTP adapter tests use an in-memory transport with dummy credentials. They
 exercise the real SDK request and response handling without network access.
 Live endpoint compatibility is not established by those tests.
-
-Reference: [OpenAI structured output and JSON-mode documentation](https://developers.openai.com/api/docs/guides/structured-outputs).

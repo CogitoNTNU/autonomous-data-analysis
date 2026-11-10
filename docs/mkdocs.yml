@@ -1,6 +1,8 @@
 site_name: Autonomous Data Analysis
 docs_dir: .
 site_dir: ../site
+exclude_docs: |
+  AGENTS.md
 
 theme:
   name: material
@@ -55,10 +57,10 @@ theme:
 
 nav:
   - Home: index.md
+  - Charts and grouped results: charts.md
       
 plugins:
   - search
-  - awesome-nav
   - autorefs
   - mkdocstrings:
       handlers:
