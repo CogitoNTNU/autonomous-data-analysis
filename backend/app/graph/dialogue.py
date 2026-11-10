@@ -8,6 +8,7 @@ from backend.app.agents.chat.schema import ChatContext, PresentedArtifact
 from backend.app.contracts.dialogue import DialogueTurn
 from backend.app.contracts.errors import AgentError
 from backend.app.contracts.state import AgentState
+from backend.app.core.exceptions import ModelProviderError
 
 from .new_analysis import NewAnalysisUpdate, new_analysis_update
 
@@ -29,7 +30,7 @@ def dialogue_graph_node(
     current = state.get("analysis_round", 1)
     try:
         reply = reply_to_message(_context(state, dialogue), model)
-    except (ValueError, TimeoutError, ConnectionError) as error:
+    except (ValueError, TimeoutError, ConnectionError, ModelProviderError) as error:
         failure = _failure(error)
         logging.getLogger(__name__).warning(
             "workflow.chat_reply_failed",
@@ -81,11 +82,13 @@ def _failure(error: Exception) -> AgentError:
         code, message = "TIMEOUT", "The chat model did not respond in time."
     elif isinstance(error, ConnectionError):
         code, message = "TOOL_FAILURE", "The chat model could not be reached."
+    elif isinstance(error, ModelProviderError):
+        code, message = "TOOL_FAILURE", "The chat provider rejected the request."
     else:
         code, message = "INVALID_OUTPUT", "The chat reply could not be validated."
     return AgentError(
         code=code,
         message=message,
         source="chat",
-        retryable=code != "INVALID_OUTPUT",
+        retryable=isinstance(error, (TimeoutError, ConnectionError)),
     )

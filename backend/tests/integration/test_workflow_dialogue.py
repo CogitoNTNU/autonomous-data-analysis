@@ -8,6 +8,7 @@ import pytest
 from backend.app.agents.planner.schema import ClarificationRequest, PlannerOutput
 from backend.app.api.planner_server import PlannerApp, dispatch
 from backend.app.contracts.dialogue import ChatReply
+from backend.app.core.exceptions import ModelProviderError
 
 from .workflow_helpers import send, settled, start
 
@@ -88,16 +89,19 @@ def test_request_for_new_calculations_runs_a_second_analysis_round(
     ]
 
 
+@pytest.mark.parametrize("failure", [TimeoutError, ConnectionError, ModelProviderError])
 def test_failed_reply_keeps_the_analysis_and_allows_another_message(
-    dialogue_app, completed, chat
+    dialogue_app, completed, chat, failure
 ):
-    chat.side_effect = TimeoutError("provider details")
+    chat.side_effect = failure("provider details")
 
     assert send(dialogue_app, completed, "Why?")[0] == 200
     result = settled(dialogue_app, completed["run_id"])
 
     assert result["status"] == "completed" and result["error"] is None
     assert result["dialogue"][1]["failed"] and result["accepts_messages"]
+    assert result["answer"] == completed["answer"]
+    assert result["analysis"] == completed["analysis"]
     assert "provider details" not in str(result)
 
 

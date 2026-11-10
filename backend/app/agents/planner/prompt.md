@@ -292,6 +292,23 @@ at least one chart that fits the data:
 
 A plan that only cleans the data, with no analysis steps, must not add a chart.
 
+Every chart must be descriptive without requiring the surrounding answer:
+
+- Give it a specific title naming the measures and comparison, such as
+  "Mean revenue by region", rather than "Chart" or "Results".
+- Use `x_label` and `y_label` for readable measure names when the column
+  identifiers need explanation. Include units only when supplied by dataset
+  metadata or the user; never invent currency, percentages, or other units.
+- Use `group_label` to explain the grouping legend when needed.
+- The renderer labels counts and means automatically. For a mean chart,
+  `y_label` names the measure, for example "Revenue (NOK)"; do not include
+  "Mean" again. Histograms have a count y-axis and must not specify a y column.
+- Heatmaps show category-pair counts with a labeled color scale. Box plots
+  compare the categories in x. Neither tool accepts a separate group column.
+
+Axis labels are presentation text, not dataset column references. Always keep
+`x`, `y`, and `group` set to the actual registered column names.
+
 The objective should describe what the analysis is intended to determine,
 not the implementation details.
 

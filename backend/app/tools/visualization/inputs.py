@@ -1,18 +1,40 @@
 """Shared chart inputs. `columns` is what the registry checks before a call."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 NUMERIC_DTYPES = frozenset({"integer", "float"})
+ChartText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+ChartKind = Literal[
+    "bar_chart", "line_chart", "scatter_plot", "histogram", "boxplot", "heatmap"
+]
 
 
 class ChartInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str = Field(min_length=1)
+    title: ChartText
     x: str = Field(min_length=1)
     y: str | None = None
     group: str | None = None
     source_result_id: str | None = None
+    x_label: ChartText | None = Field(
+        default=None, description="Readable x-axis measure, including known units."
+    )
+    y_label: ChartText | None = Field(
+        default=None,
+        description="Readable y-axis measure, including known units; counts and means are labeled automatically.",
+    )
+    group_label: ChartText | None = Field(
+        default=None, description="Readable title for the grouping legend."
+    )
+
+    @model_validator(mode="after")
+    def validate_group_label(self) -> "ChartInput":
+        if self.group_label is not None and self.group is None:
+            raise ValueError("group_label requires a group column")
+        return self
 
     @property
     def columns(self) -> list[str]:
@@ -36,6 +58,8 @@ class BarChartInput(ChartInput):
 
 
 class HistogramInput(ChartInput):
+    y: None = None
+
     @property
     def numeric_columns(self) -> list[str]:
         return [self.x]
@@ -55,6 +79,14 @@ class XYNumericAxesInput(AxesInput):
     @property
     def numeric_columns(self) -> list[str]:
         return [self.x, self.y]
+
+
+class BoxPlotInput(YNumericAxesInput):
+    group: None = None
+
+
+class HeatmapInput(AxesInput):
+    group: None = None
 
 
 def parse_chart(model: type[ChartInput], kwargs: dict[str, object]) -> ChartInput:

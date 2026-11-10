@@ -31,6 +31,20 @@ describe("ChatAnswerCard", () => {
     expect(screen.getAllByText(answer.limitations[0])).toHaveLength(1);
   });
 
+  it("renders Markdown in the final summary, findings and limitations", () => {
+    render(<ChatAnswerCard answer={{
+      ...answer,
+      text: "**East** leads revenue.",
+      findings: [{ claim: "Mean revenue is `100`.", resultIds: ["r1"] }],
+      limitations: ["*Missing values* were excluded."],
+      figureIds: [],
+    }} figures={[]} />);
+
+    expect(screen.getByText("East").tagName).toBe("STRONG");
+    expect(screen.getByText("100").tagName).toBe("CODE");
+    expect(screen.getByText("Missing values").tagName).toBe("EM");
+  });
+
   it("keeps additional findings and follow-up questions available on demand", async () => {
     const user = userEvent.setup();
     const findings = [1, 2, 3, 4].map((n) => ({ claim: `Finding ${n}`, resultIds: ["r1"] }));
@@ -58,5 +72,17 @@ describe("ChatAnswerCard", () => {
     expect(screen.getByRole("heading", { name: "Explore further" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Explain the most important finding" }));
     expect(onFollowUp).toHaveBeenCalledWith("Explain the most important finding");
+  });
+
+  it("keeps individual correlation warnings out of the visible important notes", async () => {
+    const user = userEvent.setup();
+    const explanation = "Constant sensors do not support correlation calculations.";
+    const diagnostic = "INSUFFICIENT_DATA (correlation_analysis, step corr): Correlation is undefined for sensor A and sensor B";
+    render(<ChatAnswerCard answer={{ ...answer, figureIds: [], limitations: [explanation, diagnostic] }} figures={[]} />);
+
+    expect(screen.getByText(explanation)).toBeVisible();
+    expect(screen.getByText(diagnostic)).not.toBeVisible();
+    await user.click(screen.getByText("Technical details (1)"));
+    expect(screen.getByText(diagnostic)).toBeVisible();
   });
 });

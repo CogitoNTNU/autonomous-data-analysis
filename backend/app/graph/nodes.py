@@ -23,6 +23,7 @@ from backend.app.contracts.models import (
 )
 from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import AgentState
+from backend.app.core.exceptions import ModelProviderError
 from backend.app.tools.registry import ToolRegistry
 
 from .preprocessing_repair import repair_critique
@@ -35,7 +36,7 @@ def planner_graph_node(
 ) -> AgentStateUpdate:
     try:
         response = planner_node(deepcopy(state), registry, model)
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, ModelProviderError) as error:
         response = AgentResponse[PlannerUpdates](
             status="error",
             updates=PlannerUpdates(),

@@ -8,6 +8,7 @@ from backend.app.contracts.dialogue import ChatReply, DialogueTurn
 from backend.app.contracts.final_response import FinalResponse
 from backend.app.contracts.models import AnalysisResult, DatasetReference, RunControl
 from backend.app.contracts.state import AgentState, create_initial_state
+from backend.app.core.exceptions import ModelProviderError
 from backend.app.graph.dialogue import FAILED_REPLY, dialogue_graph_node
 
 
@@ -83,6 +84,7 @@ def test_new_analysis_reply_starts_the_next_round_from_the_request():
         (TimeoutError("slow"), "TIMEOUT", True),
         (ConnectionError("down"), "TOOL_FAILURE", True),
         (ValueError("bad JSON"), "INVALID_OUTPUT", False),
+        (ModelProviderError("private credentials"), "TOOL_FAILURE", False),
     ],
 )
 def test_model_failures_are_recorded_without_failing_the_run(failure, code, retryable):

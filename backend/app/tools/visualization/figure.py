@@ -11,8 +11,14 @@ from uuid import uuid4
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
 
-from backend.app.contracts.models import Artifact, VisualizationResult, WarningEvent
-from backend.app.tools.visualization.inputs import ChartInput
+from backend.app.contracts.models import (
+    Artifact,
+    DatasetReference,
+    VisualizationResult,
+    WarningEvent,
+)
+from backend.app.tools.visualization.inputs import ChartInput, ChartKind
+from backend.app.tools.visualization.presentation import describe_chart
 from backend.app.tools.visualization.load import (
     DEFAULT_ARTIFACTS,
     HOSTED_ARTIFACTS,
@@ -27,10 +33,16 @@ def save_chart(
     draw: Callable[[Axes], None],
     *,
     input_row_count: int,
+    kind: ChartKind,
+    dataset: DatasetReference,
+    pre_aggregated: bool = False,
+    mean_applied: bool = False,
 ) -> dict[str, object]:
     # png-en lagres utenfor state, bare referansen sendes videre
     directory = output_dir if output_dir is not None else _default_directory()
-    artifact = _write_png(draw, spec, directory)
+    artifact = _write_png(
+        draw, spec, directory, kind, dataset, pre_aggregated, mean_applied
+    )
     result = VisualizationResult(
         sample_size=sample_size,
         input_row_count=input_row_count,
@@ -48,20 +60,30 @@ def _default_directory() -> Path:
 
 
 def _write_png(
-    draw: Callable[[Axes], None], spec: ChartInput, directory: Path
+    draw: Callable[[Axes], None],
+    spec: ChartInput,
+    directory: Path,
+    kind: ChartKind,
+    dataset: DatasetReference,
+    pre_aggregated: bool,
+    mean_applied: bool,
 ) -> Artifact:
     directory.mkdir(parents=True, exist_ok=True)
     artifact_id = str(uuid4())
     path = directory / f"{artifact_id}.png"
     plt = _pyplot()
-    figure, axes = plt.subplots()
+    figure, axes = plt.subplots(figsize=(8, 5.5), layout="constrained")
     try:
         draw(axes)
-        axes.set_title(spec.title)
-        axes.set_xlabel(spec.x)
-        if spec.y is not None:
-            axes.set_ylabel(spec.y)
-        figure.savefig(path, bbox_inches="tight")
+        describe_chart(
+            axes,
+            spec,
+            kind,
+            dataset,
+            pre_aggregated=pre_aggregated,
+            mean_applied=mean_applied,
+        )
+        figure.savefig(path, bbox_inches="tight", dpi=150)
     finally:
         plt.close(figure)
     return Artifact(artifact_id=artifact_id, type="figure", storage_ref=str(path))

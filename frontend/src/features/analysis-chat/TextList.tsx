@@ -1,3 +1,5 @@
+import { MarkdownText } from "@/features/analysis-chat/MarkdownText";
+
 export function TextList({
   items,
   title: heading,
@@ -13,7 +15,7 @@ export function TextList({
       <h3 className="text-lg font-semibold leading-7 tracking-tight">{heading}</h3>
       <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-7 text-foreground/85">
         {items.map((item) => (
-          <li key={item}>{item}</li>
+          <li key={item}><MarkdownText text={item} /></li>
         ))}
       </ul>
     </div>

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AgentDisclosure } from "@/features/analysis-chat/AgentDisclosure";
 import { agents } from "@/features/analysis-chat/agents";
 import { TextList } from "@/features/analysis-chat/TextList";
+import { MarkdownText } from "@/features/analysis-chat/MarkdownText";
 import type { InterpretationView } from "@/types/planner";
 
 export function InterpretationCard({
@@ -18,7 +19,7 @@ export function InterpretationCard({
       detailsTitle="Interpretation"
       summary="Interpretation finished"
     >
-      <p className="text-base leading-7">{interpretation.summary}</p>
+      <MarkdownText text={interpretation.summary} />
       <TextList
         items={interpretation.findings.map((finding) => finding.claim)}
         title="Findings"

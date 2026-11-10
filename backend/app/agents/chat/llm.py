@@ -6,12 +6,14 @@ import os
 from openai import (
     APIConnectionError,
     APIResponseValidationError,
+    APIStatusError,
     APITimeoutError,
     OpenAI,
 )
 
 from backend.app.contracts.dialogue import ChatReply
 from backend.app.core.llm_config import load_llm_settings
+from backend.app.core.llm_errors import raise_provider_error
 
 from .context import serialize_context
 from .schema import ChatContext
@@ -43,21 +45,29 @@ class ChatLLM:
                     },
                     {"role": "user", "content": serialize_context(context)},
                 ],
+                response_format={"type": "json_object"},
                 **self.settings.completion.request_kwargs(),
             )
         except APITimeoutError as error:
             raise TimeoutError("The Chat model timed out.") from error
         except APIConnectionError as error:
             raise ConnectionError("The Chat provider is unreachable.") from error
+        except APIStatusError as error:
+            raise_provider_error(error, "Chat")
         except APIResponseValidationError as error:
             raise ValueError(
                 "The Chat provider returned an invalid response."
             ) from error
 
+        if len(response.choices) != 1:
+            raise ValueError("Expected exactly one Chat response.")
         choice = response.choices[0]
         if choice.finish_reason != "stop":
             raise ValueError("The Chat response did not finish normally.")
-        content = (choice.message.content or "").strip()
+        message = choice.message
+        if message.refusal or message.tool_calls or message.function_call:
+            raise ValueError("Expected a Chat reply, not a refusal or tool call.")
+        content = (message.content or "").strip()
         if not content:
             raise ValueError("Chat returned no output")
         if content.startswith("```"):

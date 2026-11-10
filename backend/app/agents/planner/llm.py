@@ -9,6 +9,7 @@ from typing import Any
 from openai import (
     APIConnectionError,
     APIResponseValidationError,
+    APIStatusError,
     APITimeoutError,
     OpenAI,
 )
@@ -18,6 +19,7 @@ from backend.app.agents.planner.context import context_message
 from backend.app.agents.planner.schema import PlannerOutput
 from backend.app.tools.registry import ToolRegistry, registered_tool
 from backend.app.core.llm_config import load_llm_settings
+from backend.app.core.llm_errors import raise_provider_error
 
 MAX_TOOL_ROUNDS = 5
 
@@ -65,21 +67,29 @@ class PlannerLLM:
                     model=self.model,
                     messages=messages,
                     tools=tools,
+                    response_format=_response_format(),
                     **self.settings.completion.request_kwargs(),
                 )
             except APITimeoutError as error:
                 raise TimeoutError("The Planner model timed out.") from error
             except APIConnectionError as error:
                 raise ConnectionError("The Planner provider is unreachable.") from error
+            except APIStatusError as error:
+                raise_provider_error(error, "Planner")
             except APIResponseValidationError as error:
                 raise ValueError(
                     "The Planner provider returned an invalid response."
                 ) from error
 
+            if len(response.choices) != 1:
+                raise ValueError("Expected exactly one Planner response.")
             choice = response.choices[0]
-            if choice.finish_reason in {"length", "content_filter"}:
-                raise ValueError("The Planner response did not finish normally.")
             message = choice.message
+            if message.refusal:
+                raise ValueError("The Planner declined to provide a plan.")
+            expected_reason = "tool_calls" if message.tool_calls else "stop"
+            if choice.finish_reason != expected_reason:
+                raise ValueError("The Planner response did not finish normally.")
 
             if not message.tool_calls:
                 if message.content is None:
@@ -155,3 +165,17 @@ class PlannerLLM:
 
     def close(self) -> None:
         self.client.close()
+
+
+def _response_format() -> dict[str, Any]:
+    """Constrain the output branch while retaining registered tool arguments."""
+    schema = PlannerOutput.model_json_schema()
+    schema["required"] = ["plan", "clarification"]
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "planner_output",
+            "strict": False,
+            "schema": schema,
+        },
+    }

@@ -5,6 +5,13 @@
 loads `prompt.md`, calls the injected model, validates references, and preserves
 required qualifications. A successful draft still requires Critic review.
 
+Contexts are limited to 64,000 characters. If grouped tables exceed that budget,
+the model receives explicitly labeled first-row previews (at most 50 rows each,
+reduced further when necessary). Counts, sample sizes, other results, and warnings
+are preserved. The full analysis results and browser tables remain unchanged.
+Preview scope is carried into the final limitations; omitted rows cannot support
+rankings or comparisons. Contexts that still exceed the budget fail explicitly.
+
 ## Shared-state adapter
 
 `build_interpretation_input(state)` creates an independent typed input from the

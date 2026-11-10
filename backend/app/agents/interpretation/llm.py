@@ -1,7 +1,7 @@
 """OpenAI-compatible Chat Completions adapter using structured output."""
 
 from math import isfinite
-from typing import Any, NoReturn
+from typing import Any
 
 from openai import (
     APIConnectionError,
@@ -14,8 +14,8 @@ from openai.types.chat import ChatCompletion
 from pydantic import ValidationError
 
 from backend.app.contracts.models import Interpretation
-from backend.app.core.exceptions import ModelProviderError
 from backend.app.core.llm_config import CompletionOptions, IDUN_TIMEOUT_SECONDS
+from backend.app.core.llm_errors import raise_provider_error
 
 from .context import serialize_context
 from .schema import InterpretationContext
@@ -73,7 +73,7 @@ class InterpretationLLM:
                 "The interpretation provider is unreachable"
             ) from error
         except APIStatusError as error:
-            _raise_status_error(error)
+            raise_provider_error(error, "interpretation")
         except APIResponseValidationError as error:
             raise ValueError("The provider returned an invalid response") from error
         return _parse_completion(completion)
@@ -127,19 +127,3 @@ def _response_format(context: InterpretationContext) -> dict[str, Any]:
             "schema": schema,
         },
     }
-
-
-def _raise_status_error(error: APIStatusError) -> NoReturn:
-    if error.status_code == 408:
-        raise TimeoutError("The interpretation provider timed out") from error
-    if error.code in {"insufficient_quota", "billing_hard_limit_reached"}:
-        raise ModelProviderError(
-            "The model request exceeded the provider quota"
-        ) from error
-    if error.status_code in {409, 429} or 500 <= error.status_code < 600:
-        raise ConnectionError(
-            "The interpretation provider is temporarily unavailable"
-        ) from error
-    raise ModelProviderError(
-        "The interpretation provider rejected the request"
-    ) from error

@@ -24,6 +24,17 @@ describe("DialogueTurns", () => {
     expect(screen.queryByText("New analysis requested")).toBeNull();
   });
 
+  it("formats assistant Markdown while keeping the user message literal", () => {
+    render(<DialogueTurns turns={[
+      { ...base, role: "user", content: "Explain **limitations**" },
+      { ...base, role: "assistant", content: "The main limitations:\n\n- **Dropped rows**: missing values\n- **Correlation** is not causation" },
+    ]} />);
+
+    expect(screen.getByText("Explain **limitations**")).toBeVisible();
+    expect(screen.getByText("Dropped rows").tagName).toBe("STRONG");
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
   it("renders nothing for an empty dialogue", () => {
     const { container } = render(<DialogueTurns turns={[]} />);
     expect(container).toBeEmptyDOMElement();

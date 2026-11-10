@@ -4,6 +4,8 @@ import { AnalysisChartGallery } from "@/features/analysis-chat/AnalysisChartGall
 import { agents } from "@/features/analysis-chat/agents";
 import { FollowUpQuestions } from "@/features/analysis-chat/FollowUpQuestions";
 import { TextList } from "@/features/analysis-chat/TextList";
+import { MarkdownText } from "@/features/analysis-chat/MarkdownText";
+import { ImportantNotes } from "@/features/analysis-chat/ImportantNotes";
 import type { AnalysisFigure, AnalysisTable, ChatAnswer } from "@/types/planner";
 
 const fallbackFollowUps = [
@@ -23,13 +25,12 @@ export function ChatAnswerCard({
   const summary = normalize(answer.text);
   const findings = unique(answer.findings.map((finding) => finding.claim))
     .filter((claim) => normalize(claim) !== summary);
-  const notes = unique(answer.limitations);
   const followUps = unique(answer.followUps);
   const availableFollowUps = followUps.length > 0 ? followUps : fallbackFollowUps;
   return (
     <AgentTurn agent={agents.assistant}>
       <div aria-label="Analysis answer">
-        <p className="text-base leading-7">{answer.text}</p>
+        <MarkdownText text={answer.text} />
         <TextList items={findings.slice(0, 3)} title="Key findings" />
         {findings.length > 3 && (
           <details className="mt-3 text-sm text-muted-foreground">
@@ -39,7 +40,7 @@ export function ChatAnswerCard({
         )}
         {tables.map((table) => <AnalysisSummaryTable key={table.id} table={table} />)}
         <AnalysisChartGallery figures={figures} figureIds={answer.figureIds} />
-        <TextList items={notes} title="Important notes" />
+        <ImportantNotes limitations={answer.limitations} />
         {onFollowUp ? (
           <FollowUpQuestions questions={availableFollowUps} onSelect={onFollowUp} />
         ) : followUps.length > 0 && (

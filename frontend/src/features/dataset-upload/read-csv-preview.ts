@@ -26,24 +26,32 @@ export function parseCsvRows(csv: string): string[][] {
   let row: string[] = [];
   let value = "";
   let inQuotes = false;
+  let afterQuote = false;
+  let explicitRecord = false;
 
   for (let index = 0; index < csv.length; index += 1) {
     const character = csv[index];
     const nextCharacter = csv[index + 1];
 
-    if (character === '"') {
+    if (character === '"' && (inQuotes || (value.length === 0 && !afterQuote))) {
+      explicitRecord = true;
       if (inQuotes && nextCharacter === '"') {
         value += '"';
         index += 1;
+      } else if (inQuotes) {
+        inQuotes = false;
+        afterQuote = true;
       } else {
-        inQuotes = !inQuotes;
+        inQuotes = true;
       }
       continue;
     }
 
     if (character === "," && !inQuotes) {
+      explicitRecord = true;
       row.push(value);
       value = "";
+      afterQuote = false;
       continue;
     }
 
@@ -52,14 +60,19 @@ export function parseCsvRows(csv: string): string[][] {
         index += 1;
       }
       row.push(value);
-      if (row.some((cell) => cell.trim() !== "")) {
+      if (explicitRecord || row.some((cell) => cell.trim() !== "")) {
         rows.push(row);
       }
       row = [];
       value = "";
+      explicitRecord = false;
+      afterQuote = false;
       continue;
     }
 
+    if (afterQuote) {
+      throw new Error("The CSV contains invalid text after a quoted value.");
+    }
     value += character;
   }
 
@@ -68,7 +81,7 @@ export function parseCsvRows(csv: string): string[][] {
   }
 
   row.push(value);
-  if (row.some((cell) => cell.trim() !== "")) {
+  if (explicitRecord || row.some((cell) => cell.trim() !== "")) {
     rows.push(row);
   }
 
@@ -84,9 +97,15 @@ export async function readCsvPreview(file: File): Promise<DatasetPreview> {
     throw new Error("The CSV does not contain a header row.");
   }
 
-  const columns = rawColumns.map((column) => column.trim());
-  if (columns.some((column) => column.length === 0)) {
+  const columns = rawColumns;
+  if (columns.some((column) => column.trim().length === 0)) {
     throw new Error("Every CSV column must have a name.");
+  }
+  if (new Set(columns).size !== columns.length) {
+    throw new Error("Every CSV column must have a unique name.");
+  }
+  if (dataRows.some((row) => row.length !== columns.length)) {
+    throw new Error("Every CSV data row must have the same number of values as the header.");
   }
 
   return {

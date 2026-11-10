@@ -54,9 +54,7 @@ export function App({ planner }: AppProps) {
             ) : (
               <>
                 <DatasetUpload
-                  onDatasetReady={(preview, file) => {
-                    void session.acceptDataset(preview, file);
-                  }}
+                  onDatasetReady={session.acceptDataset}
                 />
                 {session.error && (
                   <PlannerError agent={agents.planner} message={session.error} />

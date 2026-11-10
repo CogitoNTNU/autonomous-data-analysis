@@ -1,6 +1,7 @@
 import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
 import { agents } from "@/features/analysis-chat/agents";
 import { UserMessage } from "@/features/analysis-chat/UserMessage";
+import { MarkdownText } from "@/features/analysis-chat/MarkdownText";
 import type { DialogueTurn } from "@/types/dialogue";
 
 export function DialogueTurns({ turns }: { turns: DialogueTurn[] }) {
@@ -11,7 +12,7 @@ export function DialogueTurns({ turns }: { turns: DialogueTurn[] }) {
       {turn.failed ? (
         <p className="text-base leading-7 text-destructive" role="alert">{turn.content}</p>
       ) : (
-        <p className="whitespace-pre-line text-base leading-7">{turn.content}</p>
+        <MarkdownText text={turn.content} />
       )}
       {turn.startsAnalysis && !turn.failed && (
         <p className="mt-2 text-sm text-muted-foreground">New analysis requested</p>

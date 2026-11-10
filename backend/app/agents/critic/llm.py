@@ -6,6 +6,7 @@ import os
 from openai import (
     APIConnectionError,
     APIResponseValidationError,
+    APIStatusError,
     APITimeoutError,
     OpenAI,
 )
@@ -13,6 +14,7 @@ from openai import (
 from backend.app.agents.critic.agent import CriticContext
 from backend.app.contracts.models import Critique
 from backend.app.core.llm_config import load_llm_settings
+from backend.app.core.llm_errors import raise_provider_error
 
 from .context import serialize_context
 
@@ -57,6 +59,8 @@ class CriticLLM:
             raise TimeoutError("The Critic model timed out.") from error
         except APIConnectionError as error:
             raise ConnectionError("The Critic provider is unreachable.") from error
+        except APIStatusError as error:
+            raise_provider_error(error, "Critic")
         except APIResponseValidationError as error:
             raise ValueError(
                 "The Critic provider returned an invalid response."

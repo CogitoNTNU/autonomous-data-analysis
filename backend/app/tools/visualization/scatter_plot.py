@@ -23,6 +23,7 @@ from backend.app.tools.visualization.load import (
     prepare_numeric,
     runtime_source_rows,
 )
+from backend.app.tools.visualization.presentation import category_label
 
 
 def run(
@@ -38,6 +39,9 @@ def run(
         output_dir,
         lambda ax: _draw(ax, loaded, spec),
         input_row_count=len(loaded),
+        kind="scatter_plot",
+        dataset=dataset,
+        pre_aggregated=runtime_source_rows(kwargs) is not None,
     )
 
 
@@ -47,7 +51,7 @@ def _draw(ax: Axes, frame: pd.DataFrame, spec: XYNumericAxesInput) -> None:
         ax.scatter(frame[spec.x], frame[spec.y])
         return
     for name, part in frame.groupby(spec.group, dropna=False):
-        ax.scatter(part[spec.x], part[spec.y], label=str(name))
+        ax.scatter(part[spec.x], part[spec.y], label=category_label(name))
     ax.legend()
 
 

@@ -29,6 +29,12 @@ class InterpretationInput(ContractModel):
     critique: Critique | None = None
 
 
+class TablePreview(ContractModel):
+    shown_rows: int = Field(ge=1)
+    total_rows: int = Field(ge=1)
+    selection: Literal["first_rows"] = "first_rows"
+
+
 class ResultEvidence(ContractModel):
     result_id: NonEmptyString
     step_id: NonEmptyString
@@ -38,6 +44,7 @@ class ResultEvidence(ContractModel):
     values: dict[str, JsonValue]
     sample_size: int = Field(ge=0)
     warnings: list[WarningEvent] = Field(default_factory=list)
+    table_preview: TablePreview | None = None
 
 
 class InterpretationEvidence(ContractModel):

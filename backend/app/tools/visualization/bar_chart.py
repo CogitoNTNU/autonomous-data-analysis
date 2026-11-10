@@ -19,22 +19,32 @@ from backend.app.tools.visualization.load import (
     read_dataset,
     runtime_source_rows,
 )
+from backend.app.tools.visualization.presentation import label_table_categories
 
 
 def run(
     dataset: DatasetReference, output_dir: Path | None = None, **kwargs: object
 ) -> dict[str, object]:
     spec = parse_chart(BarChartInput, kwargs)
-    loaded = _frame(dataset, spec, runtime_source_rows(kwargs))
+    source_rows = runtime_source_rows(kwargs)
+    loaded = _frame(dataset, spec, source_rows)
     if isinstance(loaded, dict):
         return loaded
-    table = _table(loaded, spec)
+    table = label_table_categories(_table(loaded, spec), categorical_x=True)
+    keys = [spec.x, spec.group] if spec.group else [spec.x]
     return save_chart(
         spec,
         observation_count(kwargs, len(loaded)),
         output_dir,
         lambda ax: table.plot(kind="bar", ax=ax),
         input_row_count=len(loaded),
+        kind="bar_chart",
+        dataset=dataset,
+        pre_aggregated=source_rows is not None,
+        mean_applied=(
+            spec.y is not None
+            and (source_rows is None or bool(loaded.duplicated(keys).any()))
+        ),
     )
 
 

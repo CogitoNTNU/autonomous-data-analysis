@@ -8,6 +8,7 @@ from .schema import (
     InterpretationEvidence,
     InterpretationInput,
 )
+from .table_preview import bound_grouped_tables
 
 # A configurable serialization guard, not an estimate of provider token usage.
 DEFAULT_MAX_CONTEXT_CHARACTERS = 64_000
@@ -38,7 +39,7 @@ def build_context(
         revision_feedback=feedback,
     ).model_copy(deep=True)
     _sanitize_execution_warnings(context)
-    return context
+    return bound_grouped_tables(context, DEFAULT_MAX_CONTEXT_CHARACTERS)
 
 
 def serialize_context(

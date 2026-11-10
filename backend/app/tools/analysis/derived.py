@@ -41,4 +41,20 @@ def group_aggregate_schema(
         else:
             datatype = source_datatype or "float"
         schema[alias] = {"datatype": datatype, "missing_count": 0}
+        if isinstance(source, dict):
+            source_label = source.get("label", column.replace("_", " "))
+            prefixes = {
+                "count": "Number of nonmissing values of",
+                "mean": "Mean",
+                "median": "Median",
+                "sum": "Total",
+                "min": "Minimum",
+                "max": "Maximum",
+                "std": "Standard deviation of",
+            }
+            schema[alias]["label"] = (
+                f"{prefixes.get(function, function)} {source_label}"
+            )
+            if function != "count" and "unit" in source:
+                schema[alias]["unit"] = source["unit"]
     return schema

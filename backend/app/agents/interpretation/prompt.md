@@ -66,6 +66,12 @@ groups in this dataset. For example, when the results cover three penguin specie
 say "among the three species in this dataset". Do not generalize to all species.
 `group_count` and the length of `groups` count groups, not individual observations.
 `group_sizes` gives the observed row count per group in the same order as `groups`.
+When a result has `table_preview`, only its first `shown_rows` groups are supplied;
+`total_rows` and `group_count` still describe the complete table. The preview is
+in table order, not a ranking or representative sample. Cite only displayed values,
+never infer omitted values, full-table rankings, or overall comparisons from it.
+Preserve the preview limitation. Other complete results may still support broader
+comparisons. The complete table remains available to the user in analysis results.
 For a chart derived from an aggregation, `input_row_count` counts aggregate rows;
 its `sample_size` counts the original observations represented by the source
 result. Three bars alone do not establish a low sample size or statistical

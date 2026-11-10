@@ -17,7 +17,7 @@ import {
 } from "@/features/dataset-upload/validate-dataset-file";
 
 type DatasetUploadProps = {
-  onDatasetReady?: (dataset: DatasetPreview, file: File) => void;
+  onDatasetReady?: (dataset: DatasetPreview, file: File) => void | Promise<boolean>;
 };
 
 export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
@@ -28,6 +28,7 @@ export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
   const [error, setError] = useState<string | null>(null);
 
   async function selectFile(file: File) {
+    if (isReading) return;
     const validationError = validateDatasetFile(file);
 
     if (validationError) {
@@ -41,8 +42,12 @@ export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
 
     try {
       const dataset = await readCsvPreview(file);
+      const registered = await onDatasetReady?.(dataset, file);
+      if (registered === false) {
+        setSelectedFile(null);
+        return;
+      }
       setSelectedFile(file);
-      onDatasetReady?.(dataset, file);
     } catch (reason: unknown) {
       setSelectedFile(null);
       setError(
@@ -95,8 +100,10 @@ export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
           accept=".csv,text/csv"
           aria-label="Choose CSV file"
           className="sr-only"
+          disabled={isReading}
           onChange={(event) => {
             const file = event.target.files?.item(0);
+            event.target.value = "";
             if (file) {
               void selectFile(file);
             }
@@ -110,7 +117,7 @@ export function DatasetUpload({ onDatasetReady }: DatasetUploadProps) {
             <div className="mx-auto grid size-10 place-items-center rounded-xl border border-border bg-background text-muted-foreground">
               <LoaderCircle className="size-5 animate-spin" />
             </div>
-            <p className="mt-3 text-base font-medium">Reading CSV preview</p>
+            <p className="mt-3 text-base font-medium">Loading CSV</p>
             <p className="mt-1 text-sm text-muted-foreground">
               The original file stays unchanged.
             </p>

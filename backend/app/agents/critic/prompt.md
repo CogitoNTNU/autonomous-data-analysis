@@ -62,6 +62,14 @@ Identify important questions or required comparisons that remain unanswered.
 
 Do not request additional analysis if the existing results already answer the question.
 
+The application displays complete `group_aggregate` tables alongside the answer.
+A request for a detailed table does not require enumerating every row in prose.
+Large tables may be previewed only in the Interpretation agent's model context;
+the full results supplied to you and displayed to the user remain unchanged.
+An explicit preview limitation describes that context boundary, not missing
+analysis. Check that the interpretation distinguishes preview scope from the
+complete table and does not infer full-table rankings from an incomplete preview.
+
 ### 2. Grounding
 
 Every important analytical claim must be supported by available results.
