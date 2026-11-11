@@ -21,3 +21,4 @@ class CriticContext(ContractModel):
     preprocessing_report: PreprocessingReport | None = None
     analysis_execution_report: AnalysisExecutionReport | None = None
     warnings: list[WarningEvent] = Field(default_factory=list)
+    output_feedback: str | None = None

@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import httpx2
 import pytest
 from openai import APIConnectionError, APIResponseValidationError, APITimeoutError
+from openai.types.chat import ChatCompletion
 
 from backend.app.agents.critic.llm import CriticLLM
 from backend.app.contracts.models import Critique, DatasetReference
@@ -24,15 +25,21 @@ def critic_provider(monkeypatch: pytest.MonkeyPatch) -> tuple[CriticLLM, Mock]:
     }.items():
         monkeypatch.setenv(name, value)
     completion = Mock(
-        return_value=SimpleNamespace(
+        return_value=ChatCompletion(
+            id="review-1",
+            created=0,
+            model="test-model",
+            object="chat.completion",
             choices=[
-                SimpleNamespace(
-                    finish_reason="stop",
-                    message=SimpleNamespace(
-                        content=Critique(decision="approved").model_dump_json()
-                    ),
-                )
-            ]
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": Critique(decision="approved").model_dump_json(),
+                    },
+                },
+            ],
         )
     )
     monkeypatch.setattr(
@@ -85,7 +92,11 @@ def test_graph_classifies_critic_provider_failures(
         critic_model=model,
     )
     state = create_initial_state(
-        "Describe age", pipeline_dataset, max_revisions=2, max_retries=0
+        "Describe age",
+        pipeline_dataset,
+        max_revisions=2,
+        max_retries=0,
+        max_output_repairs=0,
     )
 
     result = graph.invoke(state, config={"recursion_limit": 10})
@@ -131,3 +142,38 @@ def test_critic_provider_receives_independent_execution_evidence(
     ]
     assert payload["analysis_execution_report"]["outcome"] == "complete"
     assert "warnings" in payload
+
+
+def test_connection_timeouts_keep_network_diagnostic_and_bounded_retries(
+    pipeline_dataset,
+    pipeline_registry,
+    pipeline_models,
+    critic_provider,
+):
+    model, completion = critic_provider
+    request = httpx2.Request("POST", "https://provider.invalid/v1/chat/completions")
+    timeout = APITimeoutError(request=request)
+    timeout.__cause__ = httpx2.ConnectTimeout(
+        "private network details", request=request
+    )
+    completion.side_effect = timeout
+    graph = build_graph(
+        pipeline_registry,
+        pipeline_models[0],
+        interpretation_model=pipeline_models[1],
+        critic_model=model,
+    )
+
+    result = graph.invoke(
+        create_initial_state("Describe age", pipeline_dataset, max_retries=1),
+        config={"recursion_limit": 15},
+    )
+
+    assert completion.call_count == 2
+    assert result["control"].status == "error"
+    assert result["last_node_error"].code == "TOOL_FAILURE"
+    assert result["last_node_error"].details == {"reason": "model_connection_failed"}
+    assert result["interpretation"] is not None
+    assert result["critique"] is None
+    pipeline_models[0].assert_called_once()
+    pipeline_models[1].assert_called_once()

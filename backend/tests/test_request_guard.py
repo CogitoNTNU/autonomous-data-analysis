@@ -2,11 +2,12 @@
 
 import json
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
 from backend.app.api.origins import require_site_origin
-from backend.app.api.planner_server import PlannerApp, dispatch
+from backend.app.api.planner_server import MAX_BODY_BYTES, PlannerApp, _body, dispatch
 from backend.app.api.redact import redact
 from backend.app.services.uploads import store_named_csv
 from backend.app.storage.datasets import create_dataset_reference
@@ -14,6 +15,16 @@ from backend.app.tools.registry import ToolRegistry
 
 SECRET = "sk-test-private-key-value"
 DATASET_ID = "33333333-3333-4333-8333-333333333333"
+
+
+def test_oversized_http_body_is_rejected_before_reading():
+    handler = Mock()
+    handler.headers = {"Content-Length": str(MAX_BODY_BYTES + 1)}
+
+    with pytest.raises(ValueError, match="too large"):
+        _body(handler)
+
+    handler.rfile.read.assert_not_called()
 
 
 def test_redact_removes_secret_values_and_key_shaped_text(monkeypatch) -> None:

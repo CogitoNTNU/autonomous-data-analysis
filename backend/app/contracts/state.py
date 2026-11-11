@@ -57,6 +57,7 @@ def create_initial_state(
     conversation_context: list[ConversationMessage] | None = None,
     max_revisions: int = 2,
     max_retries: int = 2,
+    max_output_repairs: int = 2,
 ) -> AgentState:
     """Create isolated mutable values for each user run."""
     return AgentState(
@@ -80,7 +81,11 @@ def create_initial_state(
         last_node_status=None,
         last_node_error=None,
         revision_history=[],
-        control=RunControl(max_revisions=max_revisions, max_retries=max_retries),
+        control=RunControl(
+            max_revisions=max_revisions,
+            max_retries=max_retries,
+            max_output_repairs=max_output_repairs,
+        ),
         clarification_question=None,
         clarification_count=0,
         dialogue=[],

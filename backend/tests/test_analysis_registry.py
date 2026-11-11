@@ -157,6 +157,30 @@ def test_timeout_returns_failed_result_instead_of_raising():
     assert result.values["status"] == "failed"
 
 
+def test_cache_does_not_reuse_results_for_another_dataset_at_same_version():
+    tool = Mock(
+        side_effect=[{"sample_size": 1, "mean": 10}, {"sample_size": 1, "mean": 20}]
+    )
+    registry = _registry(tool)
+    first = _dataset()
+    second = first.model_copy(
+        update={"dataset_id": "another", "storage_ref": "another.csv"}
+    )
+    step = PlanStep(
+        step_id="stats",
+        tool_name="descriptive_statistics",
+        arguments={"columns": ["age"]},
+    )
+    cache = {}
+
+    one = execute_step(step, first, registry, cache=cache)
+    two = execute_step(step, second, registry, cache=cache)
+
+    assert one.values["mean"] == 10
+    assert two.values["mean"] == 20
+    assert tool.call_count == 2
+
+
 def test_tool_receives_stable_random_state():
     tool = Mock(return_value={"columns": {"age": {"mean": 1.0}}, "sample_size": 1})
     execute_step(

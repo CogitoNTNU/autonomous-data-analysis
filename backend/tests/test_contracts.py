@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from backend.app.contracts import AgentError, AgentResponse, create_initial_state
 from backend.app.contracts.models import (
+    AnalysisExecutionReport,
     AnalysisResult,
     Critique,
     CriticUpdates,
@@ -12,6 +13,12 @@ from backend.app.contracts.models import (
     PlannerUpdates,
     RunControl,
 )
+
+
+def test_unneeded_analysis_report_has_no_step_outcomes():
+    assert AnalysisExecutionReport(outcome="not_required").completed_step_ids == []
+    with pytest.raises(ValidationError, match="cannot contain step outcomes"):
+        AnalysisExecutionReport(outcome="not_required", completed_step_ids=["analysis"])
 
 
 def dataset():

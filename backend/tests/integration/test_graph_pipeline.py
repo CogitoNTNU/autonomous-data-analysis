@@ -160,19 +160,21 @@ def test_analysis_gaps_continue_only_with_successful_evidence(
         pipeline_models[2].assert_not_called()
 
 
-def test_empty_analysis_plan_stops_before_interpretation(
+def test_empty_plan_stops_before_execution(
     pipeline_graph: CompiledStateGraph,
     pipeline_dataset: DatasetReference,
     pipeline_plan: Plan,
     pipeline_models: tuple[Mock, Mock, Mock],
 ) -> None:
     pipeline_plan.analysis_steps = []
+    pipeline_plan.preprocessing_steps = []
     state = create_initial_state("Describe age", pipeline_dataset, max_revisions=0)
 
     result = pipeline_graph.invoke(state, config={"recursion_limit": 10})
 
-    assert result["analysis_execution_report"].outcome == "failed"
-    assert result["errors"][0].code == "INVALID_DATA"
+    assert result["analysis_execution_report"] is None
+    assert result["errors"][0].code == "INVALID_OUTPUT"
+    assert result["errors"][0].source == "planner"
     pipeline_models[1].assert_not_called()
     pipeline_models[2].assert_not_called()
 

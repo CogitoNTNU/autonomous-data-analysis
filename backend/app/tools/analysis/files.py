@@ -2,6 +2,10 @@
 
 from pathlib import Path
 
+import pandas as pd
+
+from backend.app.contracts.models import DatasetReference
+
 from backend.app.storage.datasets import HOSTED_UPLOADS
 
 BACKEND = Path(__file__).resolve().parents[3]
@@ -10,6 +14,20 @@ ALLOWED_DATA_DIRECTORIES = (
     (BACKEND / "tests" / "fixtures").resolve(),
     HOSTED_UPLOADS.resolve(),
 )
+
+
+def read_frame(
+    dataset: DatasetReference, *, columns: list[str] | None = None
+) -> pd.DataFrame:
+    """Preserve declared text columns rather than inferring numeric categories."""
+    dtypes = {
+        name: "string"
+        for name, info in dataset.dataset_schema.items()
+        if isinstance(info, dict)
+        and info.get("datatype") in {"string", "date"}
+        and (columns is None or name in columns)
+    }
+    return pd.read_csv(resolve_csv(dataset.storage_ref), dtype=dtypes, usecols=columns)
 
 
 def resolve_csv(storage_ref: str) -> Path:

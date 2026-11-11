@@ -5,6 +5,7 @@ import os
 from openai import OpenAI
 
 from backend.app.core.llm_config import load_llm_settings
+from backend.app.core.llm_transport import model_timeout
 
 
 def ensure_llm_environment() -> None:
@@ -20,6 +21,6 @@ def ntnu_client() -> OpenAI:
     return OpenAI(
         base_url=str(settings.base_url),
         api_key=settings.api_key.get_secret_value(),
-        timeout=settings.timeout_seconds,
+        timeout=model_timeout(settings.timeout_seconds),
         max_retries=0,
     )

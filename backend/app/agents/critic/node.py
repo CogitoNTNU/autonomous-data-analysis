@@ -12,6 +12,8 @@ from backend.app.contracts.state import AgentState
 def critic_node(
     state: AgentState,
     model: CriticModel,
+    *,
+    output_feedback: str | None = None,
 ) -> AgentResponse[CriticUpdates]:
     """Return a typed review; the graph owns state translation and routing."""
 
@@ -24,4 +26,5 @@ def critic_node(
         preprocessing_report=state["preprocessing_report"],
         analysis_execution_report=state["analysis_execution_report"],
         warnings=state["warnings"],
+        output_feedback=output_feedback,
     )

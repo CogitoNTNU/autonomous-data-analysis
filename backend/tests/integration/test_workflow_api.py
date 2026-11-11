@@ -259,3 +259,93 @@ def test_interpretation_timeouts_retry_once_reuse_client_and_then_stop(
     model.close.assert_called_once()
     assert pipeline_models[0].call_count == 1
     pipeline_models[2].assert_not_called()
+
+
+def test_failed_review_recovers_from_checkpoint_without_repeating_analysis(
+    workflow_app,
+    pipeline_dataset,
+    pipeline_models,
+):
+    from backend.app.core.exceptions import ModelOutputError
+
+    critic = pipeline_models[2]
+    critic.side_effect = ModelOutputError("invalid_json")
+    failed = settled(workflow_app, start(workflow_app, pipeline_dataset)["run_id"])
+    assert failed["status"] == "error"
+    assert failed["can_retry_review"] is True
+    assert failed["answer"] is None
+    assert "analysis is saved" in failed["error"]["message"]
+    assert critic.call_count == 3
+    request = {"run_id": failed["run_id"], "checkpoint_id": failed["checkpoint_id"]}
+
+    critic.side_effect = None
+    critic.return_value = Critique(decision="approved")
+    assert post(workflow_app, "/api/workflows/retry-review", request)[0] == 200
+    recovered = settled(workflow_app, failed["run_id"])
+
+    assert recovered["status"] == "completed"
+    assert recovered["can_retry_review"] is False
+    assert recovered["analysis"] == failed["analysis"]
+    assert recovered["interpretation"] == failed["interpretation"]
+    assert recovered["report"] == failed["report"]
+    assert critic.call_count == 4
+    pipeline_models[0].assert_called_once()
+    pipeline_models[1].assert_called_once()
+    assert post(workflow_app, "/api/workflows/retry-review", request)[0] == 400
+
+
+def test_review_recovery_rejects_stale_checkpoints_and_client_outputs(
+    workflow_app,
+    pipeline_dataset,
+    pipeline_models,
+):
+    from backend.app.core.exceptions import ModelOutputError
+
+    pipeline_models[2].side_effect = ModelOutputError("empty_response")
+    failed = settled(workflow_app, start(workflow_app, pipeline_dataset)["run_id"])
+    request = {"run_id": failed["run_id"], "checkpoint_id": "stale"}
+    assert post(workflow_app, "/api/workflows/retry-review", request)[0] == 400
+    request["checkpoint_id"] = failed["checkpoint_id"]
+    request["critique"] = {"decision": "approved"}
+    assert post(workflow_app, "/api/workflows/retry-review", request)[0] == 422
+    assert pipeline_models[2].call_count == 3
+
+
+def test_review_recovery_lease_rejects_concurrent_submissions(
+    workflow_app,
+    pipeline_dataset,
+    pipeline_models,
+):
+    from backend.app.core.exceptions import ModelOutputError
+
+    pipeline_models[2].side_effect = ModelOutputError("invalid_json")
+    failed = settled(workflow_app, start(workflow_app, pipeline_dataset)["run_id"])
+    request = {"run_id": failed["run_id"], "checkpoint_id": failed["checkpoint_id"]}
+    with workflow_app.workflows.store.acquire(failed["run_id"]):
+        code, body = post(workflow_app, "/api/workflows/retry-review", request)
+        assert code == 400
+        assert "already running" in body["message"]
+    assert pipeline_models[2].call_count == 3
+
+
+def test_web_workflow_corrects_malformed_planner_output_before_execution(
+    workflow_app,
+    pipeline_dataset,
+    pipeline_models,
+):
+    from backend.app.core.exceptions import ModelOutputError
+
+    planner = pipeline_models[0]
+    planner.side_effect = [
+        ModelOutputError("incomplete_response"),
+        planner.return_value,
+    ]
+
+    result = settled(workflow_app, start(workflow_app, pipeline_dataset)["run_id"])
+
+    assert result["status"] == "completed"
+    assert result["error"] is None
+    assert planner.call_count == 2
+    assert "incomplete_response" in planner.call_args.args[1].output_feedback
+    pipeline_models[1].assert_called_once()
+    pipeline_models[2].assert_called_once()

@@ -18,6 +18,8 @@ from backend.app.contracts.models import (
     PlanStep,
     WarningEvent,
 )
+from backend.app.tools.output import ToolOutput
+from backend.app.tools.process import run_isolated
 
 SOURCE = "analysis"
 DEFAULT_TIMEOUT_SECONDS = 30.0
@@ -48,8 +50,9 @@ class Tool:
 
 
 class ToolRegistry:
-    def __init__(self) -> None:
+    def __init__(self, *, isolate_execution: bool = False) -> None:
         self._tools: dict[str, Tool] = {}
+        self.isolate_execution = isolate_execution
 
     def register(self, tool: Tool) -> None:
         if tool.name in self._tools:
@@ -125,10 +128,15 @@ def execute_step(
     kwargs.update(runtime_arguments or {})
     kwargs.setdefault("random_state", DEFAULT_RANDOM_STATE)
     try:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            payload = dict(
-                pool.submit(tool.run, dataset, **kwargs).result(timeout=timeout_seconds)
-            )
+        if registry.isolate_execution:
+            payload = dict(run_isolated(tool.run, dataset, kwargs, timeout_seconds))
+        else:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                payload = dict(
+                    pool.submit(tool.run, dataset, **kwargs).result(
+                        timeout=timeout_seconds
+                    )
+                )
     except FuturesTimeoutError:
         return fail(
             step,
@@ -147,19 +155,19 @@ def execute_step(
         )
     except Exception as exc:  # noqa: BLE001 - tool failures become structured results
         return fail(step, dataset, "TOOL_FAILURE", str(exc) or type(exc).__name__)
-    raw_artifacts = payload.pop("artifacts", [])
+    try:
+        output = ToolOutput.model_validate(payload)
+        warnings = [
+            warning.model_copy(update={"step_id": warning.step_id or step.step_id})
+            for warning in output.warnings
+        ]
+        outcome = result(
+            step, dataset, output.model_extra or {}, output.sample_size, warnings
+        )
+    except (ValueError, TypeError):
+        return fail(step, dataset, "TOOL_FAILURE", "Tool returned invalid output.")
     if artifacts is not None:
-        artifacts.extend(parse_artifacts(raw_artifacts))
-    raw_warnings = payload.pop("warnings", [])
-    sample = payload.pop("sample_size", 0)
-    warnings = [as_warning(item, step.step_id) for item in raw_warnings]
-    outcome = result(
-        step,
-        dataset,
-        payload,
-        sample if isinstance(sample, int) and sample >= 0 else 0,
-        warnings,
-    )
+        artifacts.extend(output.artifacts)
     if runtime_arguments is None and cache is not None:
         cache[key] = outcome
     return outcome
@@ -256,23 +264,13 @@ def cache_key(step: PlanStep, dataset: DatasetReference) -> str:
         {
             "method": step.tool_name,
             "parameters": parameters,
+            "dataset_id": dataset.dataset_id,
+            "storage_ref": dataset.storage_ref,
             "dataset_version": dataset.version,
         },
         sort_keys=True,
         default=str,
     )
-
-
-def parse_artifacts(raw: object) -> list[Artifact]:
-    if not isinstance(raw, list):
-        return []
-    parsed: list[Artifact] = []
-    for item in raw:
-        if isinstance(item, Artifact):
-            parsed.append(item)
-        elif isinstance(item, dict):
-            parsed.append(Artifact.model_validate(item))
-    return parsed
 
 
 def fail(
@@ -316,16 +314,4 @@ def result(
         values={**values, "status": status},
         sample_size=sample_size,
         warnings=warnings,
-    )
-
-
-def as_warning(item: object, step_id: str) -> WarningEvent:
-    if isinstance(item, WarningEvent):
-        return item.model_copy(update={"step_id": item.step_id or step_id})
-    data = item if isinstance(item, dict) else {}
-    return WarningEvent(
-        code=str(data.get("code", "TOOL_FAILURE")),
-        message=str(data.get("message", "tool warning")),
-        source=str(data.get("source", SOURCE)),
-        step_id=step_id,
     )

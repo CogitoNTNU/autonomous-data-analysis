@@ -48,4 +48,13 @@ describe("workflow API", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: "Unknown workflow" }), { status: 400 })));
     await expect(browserWorkflow.status("missing")).rejects.toThrow("Unknown workflow");
   });
+
+  it("retries only the saved review using the server checkpoint", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...payload, can_retry_review: true })));
+    vi.stubGlobal("fetch", fetcher);
+    const result = await browserWorkflow.retryReview({ runId: "run-1", checkpointId: "checkpoint-1" });
+    expect(fetcher).toHaveBeenCalledWith("/api/workflows/retry-review", expect.objectContaining({ method: "POST" }));
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ run_id: "run-1", checkpoint_id: "checkpoint-1" });
+    expect(result.canRetryReview).toBe(true);
+  });
 });

@@ -10,7 +10,7 @@ from backend.app.contracts.models import (
     WarningEvent,
 )
 from backend.app.contracts.responses import AgentResponse
-from backend.app.core.exceptions import ModelProviderError
+from backend.app.core.exceptions import ModelConnectionError, ModelProviderError
 
 from .context import build_context, serialize_context
 from .evidence import prepare_evidence
@@ -62,7 +62,9 @@ def _run_attempt(
     except ValueError:
         return _failure("INVALID_DATA", "Interpretation input or evidence is invalid.")
 
-    if not context.evidence.results:
+    if not context.evidence.results and not (
+        request.plan.is_preprocessing_only and request.preprocessing_report is not None
+    ):
         return _failure(
             "INSUFFICIENT_DATA",
             "No usable analysis evidence is available.",
@@ -97,6 +99,14 @@ def _generate_interpretation(
             warnings=context.evidence.warnings,
             retryable=True,
         )
+    except ModelConnectionError:
+        return _failure(
+            "TOOL_FAILURE",
+            "The interpretation provider could not be reached.",
+            warnings=context.evidence.warnings,
+            retryable=True,
+            connection_failed=True,
+        )
     except ConnectionError:
         return _failure(
             "TOOL_FAILURE",
@@ -129,6 +139,7 @@ def _failure(
     *,
     warnings: list[WarningEvent] | None = None,
     retryable: bool = False,
+    connection_failed: bool = False,
 ) -> AgentResponse[InterpretationUpdates]:
     return AgentResponse[InterpretationUpdates](
         status="error",
@@ -139,5 +150,6 @@ def _failure(
             message=message,
             source="interpretation",
             retryable=retryable,
+            details={"reason": "model_connection_failed"} if connection_failed else {},
         ),
     )

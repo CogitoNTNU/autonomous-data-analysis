@@ -16,4 +16,6 @@ def can_retry(error: AgentError | None, control: RunControl) -> bool:
 
 def workflow_recursion_limit(control: RunControl) -> int:
     """Allow all configured attempts plus start/finish and a termination margin."""
-    return 3 + 5 * (1 + control.max_revisions) * (1 + control.max_retries)
+    return 3 + (5 + 2 * control.max_output_repairs) * (1 + control.max_retries) * (
+        1 + control.max_revisions
+    )

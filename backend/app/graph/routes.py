@@ -7,6 +7,7 @@ from backend.app.contracts.models import Critique, RunControl
 from backend.app.contracts.state import AgentState
 
 from .limits import can_retry
+from .output_repair import can_repair_output
 from .preprocessing_repair import is_preprocessing_repair, is_repairable_failure
 
 RevisionTarget = Literal["planner", "preprocessing", "analysis", "interpretation"]
@@ -35,7 +36,9 @@ def _blocked(state: AgentState) -> bool:
 def route_after_planner(
     state: AgentState,
 ) -> Literal["planner", "preprocessing", "end"]:
-    if can_retry(state["last_node_error"], state["control"]):
+    if can_retry(state["last_node_error"], state["control"]) or can_repair_output(
+        state["last_node_error"], state["control"]
+    ):
         return "planner"
     if _blocked(state):
         return "end"
@@ -76,7 +79,14 @@ def route_after_analysis(
     if state["plan"] is None or state["processed_dataset"] is None:
         return "end"
     report = state["analysis_execution_report"]
-    if report is None or report.outcome == "failed" or not state["analysis_results"]:
+    if report is None or report.outcome == "failed":
+        return "end"
+    if report.outcome == "not_required" and not state["plan"].is_preprocessing_only:
+        return "end"
+    if not state["analysis_results"] and not (
+        state["plan"].is_preprocessing_only
+        and state["preprocessing_report"] is not None
+    ):
         return "end"
     # Usable partial results retain limitations and still require Critic approval.
     return "interpretation"
@@ -96,7 +106,9 @@ def route_after_interpretation(
 
 def route_after_critic(state: AgentState) -> RevisionTarget | Literal["critic", "end"]:
     """Retry this review or route actionable feedback within the revision budget."""
-    if can_retry(state["last_node_error"], state["control"]):
+    if can_retry(state["last_node_error"], state["control"]) or can_repair_output(
+        state["last_node_error"], state["control"]
+    ):
         return "critic"
     if _blocked(state) or state["control"].status != "running":
         return "end"

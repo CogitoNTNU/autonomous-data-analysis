@@ -6,7 +6,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
 from backend.app.contracts.models import DatasetReference, WarningEvent
-from backend.app.tools.analysis.files import resolve_csv
+from backend.app.tools.analysis.files import read_frame
 from backend.app.tools.registry import Tool
 
 MAX_INLINE_CATEGORIES = 1_000
@@ -101,7 +101,7 @@ def run(dataset: DatasetReference, **kwargs: object) -> dict[str, object]:
     request = CategoricalAnalysisInput.model_validate(
         {"column": kwargs.get("column"), "normalize": kwargs.get("normalize")}
     )
-    series = pd.read_csv(resolve_csv(dataset.storage_ref))[request.column]
+    series = read_frame(dataset)[request.column]
     return _result(request.column, bool(request.normalize), series)
 
 

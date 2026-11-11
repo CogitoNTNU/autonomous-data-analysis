@@ -9,6 +9,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from ...models.dataset import ColumnMetadata, DatasetMetadata
+from backend.app.storage.csv_records import csv_records
 from .core import MISSING_VALUES, PreprocessingToolError
 
 
@@ -29,11 +30,17 @@ def resolve_dataset_path(uri: str) -> Path:
 
 def load_csv(uri: str) -> tuple[list[str], list[dict[str, str]]]:
     path = resolve_dataset_path(uri)
-    with path.open(encoding="utf-8", newline="") as csv_file:
-        reader = csv.DictReader(csv_file)
-        if reader.fieldnames is None:
+    with path.open(encoding="utf-8-sig", newline="") as csv_file:
+        reader = csv_records(csv_file.read())
+        fieldnames = next(reader, None)
+        if fieldnames is None:
             raise PreprocessingToolError(f"Dataset has no header row: {uri}")
-        return reader.fieldnames, list(reader)
+        rows = []
+        for row in reader:
+            if len(row) != len(fieldnames):
+                raise PreprocessingToolError("CSV rows must match the header width")
+            rows.append(dict(zip(fieldnames, row, strict=True)))
+        return fieldnames, rows
 
 
 def write_csv(
@@ -55,7 +62,9 @@ def write_csv(
     return str(output), output_hash
 
 
-def build_metadata(fieldnames: list[str], rows: list[dict[str, str]]) -> DatasetMetadata:
+def build_metadata(
+    fieldnames: list[str], rows: list[dict[str, str]]
+) -> DatasetMetadata:
     columns = []
     total_missing = 0
     for fieldname in fieldnames:
@@ -96,8 +105,12 @@ def build_metadata(fieldnames: list[str], rows: list[dict[str, str]]) -> Dataset
             )
         )
 
-    signatures = [tuple(row.get(fieldname, "") for fieldname in fieldnames) for row in rows]
-    duplicate_count = sum(count - 1 for count in Counter(signatures).values() if count > 1)
+    signatures = [
+        tuple(row.get(fieldname, "") for fieldname in fieldnames) for row in rows
+    ]
+    duplicate_count = sum(
+        count - 1 for count in Counter(signatures).values() if count > 1
+    )
     return DatasetMetadata(
         row_count=len(rows),
         column_count=len(fieldnames),

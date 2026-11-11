@@ -11,6 +11,8 @@ def planner_node(
     state: AgentState,
     registry: ToolRegistry,
     model: PlannerModel,
+    *,
+    output_feedback: str | None = None,
 ) -> AgentResponse[PlannerUpdates]:
     """Read workflow inputs and return the typed Planner response."""
 
@@ -22,4 +24,5 @@ def planner_node(
         registry=registry,
         model=model,
         previous_plan=state["plan"],
+        output_feedback=output_feedback,
     )

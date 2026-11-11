@@ -39,7 +39,8 @@ def test_planner_and_critic_use_the_shared_timeout_and_generation_policy(
     monkeypatch.setattr(f"backend.app.agents.{agent}.llm.OpenAI", factory)
     model = PlannerLLM(ToolRegistry()) if agent == "planner" else CriticLLM()
 
-    assert factory.call_args.kwargs["timeout"] == 75
+    assert factory.call_args.kwargs["timeout"].read == 75
+    assert factory.call_args.kwargs["timeout"].connect == 5
     assert factory.call_args.kwargs["max_retries"] == 0
     assert model.settings.completion.request_kwargs() == {
         "max_tokens": 2048,
@@ -96,6 +97,7 @@ def test_live_interpretation_uses_configured_timeout_instead_of_30_seconds(
             ),
         )
         assert sent[0].extensions["timeout"]["read"] == 75
+        assert sent[0].extensions["timeout"]["connect"] == 5
         assert json.loads(sent[0].content)["reasoning_effort"] == "low"
         assert len(sent) == 1
     finally:
@@ -169,6 +171,7 @@ def test_generation_limits_reach_planner_and_critic_http_requests(
         else:
             model("Review the supplied context.", context)
         assert sent[0].extensions["timeout"]["read"] == 75
+        assert sent[0].extensions["timeout"]["connect"] == 5
         assert json.loads(sent[0].content)["reasoning_effort"] == "low"
         assert json.loads(sent[0].content)["max_tokens"] == 2048
         assert len(sent) == 1

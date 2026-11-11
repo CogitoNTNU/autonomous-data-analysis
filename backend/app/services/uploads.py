@@ -1,10 +1,10 @@
 """Store an uploaded CSV inside the allowed dataset directory."""
 
 import csv
-from collections.abc import Iterator
-from io import StringIO
 from pathlib import Path
 from uuid import UUID, uuid4
+
+from backend.app.storage.csv_records import csv_records
 
 MAX_CSV_BYTES = 10 * 1024 * 1024
 
@@ -17,7 +17,15 @@ def save_csv(directory: Path, content: bytes) -> Path:
 def store_named_csv(directory: Path, dataset_id: str, content: bytes) -> Path:
     _dataset_id(dataset_id)
     _checked(content)
-    return _write(directory, f"{dataset_id}.csv", content)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{dataset_id}.csv"
+    try:
+        with path.open("xb") as output:
+            output.write(content)
+    except FileExistsError:
+        if path.read_bytes() != content:
+            raise ValueError("Registered dataset cannot be replaced") from None
+    return path
 
 
 def _dataset_id(dataset_id: str) -> None:
@@ -42,7 +50,7 @@ def _checked(content: bytes) -> None:
 
 
 def _check_rows(text: str) -> None:
-    rows = _records(text)
+    rows = csv_records(text)
     try:
         header = next(rows, None)
         if header is None:
@@ -58,17 +66,6 @@ def _check_rows(text: str) -> None:
         raise ValueError(
             "The CSV contains an invalid field or malformed quoted value"
         ) from exc
-
-
-def _records(text: str) -> Iterator[list[str]]:
-    lines = list(StringIO(text, newline=""))
-    reader = csv.reader(lines, strict=True)
-    start = 0
-    for row in reader:
-        end = reader.line_num
-        if "".join(lines[start:end]).strip():
-            yield row
-        start = end
 
 
 def _write(directory: Path, name: str, content: bytes) -> Path:

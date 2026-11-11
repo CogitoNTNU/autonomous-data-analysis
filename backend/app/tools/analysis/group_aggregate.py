@@ -7,7 +7,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.app.contracts.models import DatasetReference, WarningEvent
-from backend.app.tools.analysis.files import resolve_csv
+from backend.app.tools.analysis.files import read_frame
 from backend.app.tools.registry import Tool
 
 AggregationFunction = Literal["count", "mean", "median", "sum", "min", "max", "std"]
@@ -117,7 +117,7 @@ def run(dataset: DatasetReference, **kwargs: object) -> dict[str, object]:
             "aggregations": kwargs.get("aggregations"),
         }
     )
-    frame = pd.read_csv(resolve_csv(dataset.storage_ref))
+    frame = read_frame(dataset)
     named_aggregations = {
         aggregation.alias: pd.NamedAgg(
             column=aggregation.column,

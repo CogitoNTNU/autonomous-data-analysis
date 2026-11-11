@@ -15,6 +15,7 @@ from backend.app.contracts.models import (
     WarningEvent,
 )
 from backend.app.contracts.responses import AgentResponse
+from backend.app.core.exceptions import ModelOutputError
 
 from .schema import CriticContext
 
@@ -34,6 +35,7 @@ def run_critic(
     preprocessing_report: PreprocessingReport | None = None,
     analysis_execution_report: AnalysisExecutionReport | None = None,
     warnings: list[WarningEvent] | None = None,
+    output_feedback: str | None = None,
 ) -> AgentResponse[CriticUpdates]:
     """Evaluate an interpretation and return structured feedback."""
 
@@ -56,12 +58,28 @@ def run_critic(
         preprocessing_report=preprocessing_report,
         analysis_execution_report=analysis_execution_report,
         warnings=warnings or [],
+        output_feedback=output_feedback,
     ).model_copy(deep=True)
 
     prompt = PROMPT_PATH.read_text(encoding="utf-8")
 
     try:
         critique = model(prompt, context)
+    except ModelOutputError as exc:
+        return AgentResponse(
+            status="error",
+            updates=CriticUpdates(),
+            error=AgentError(
+                code="INVALID_OUTPUT",
+                message=str(exc),
+                source="critic",
+                details={
+                    "reason": "model_output_invalid",
+                    "output_reason": exc.reason,
+                    "validation_types": exc.validation_types,
+                },
+            ),
+        )
     except ValueError as exc:
         return AgentResponse(
             status="error",

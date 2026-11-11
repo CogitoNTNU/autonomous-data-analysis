@@ -76,6 +76,12 @@ Before adding a preprocessing or analysis tool to the plan, verify that:
 Inspection results are planning context only. Do not present them as the
 final analysis result.
 
+Every plan must contain at least one executable preprocessing or analysis step.
+For questions about which columns contain missing values, select
+`missing_values_summary` with all dataset columns. For missingness in named
+columns, select those columns. This produces recorded evidence for Interpretation;
+do not copy metadata counts into expected_outputs or return an empty plan.
+
 # Dataset rules
 
 Treat the dataset metadata as authoritative.
@@ -159,6 +165,14 @@ to the Interpretation Agent.
 
 # Clarification
 
+An unspecified success metric is a material ambiguity. If the user has not
+already specified the criterion in this request or conversation, for requests such as
+"Which region performs best?", ask which measure and aggregation define best
+before producing any executable plan. Do not assume that amount is the measure,
+that higher is better, or that totals should outrank averages. Listing alternative
+rankings later does not replace obtaining the user's criterion first. Stating
+these choices as assumptions does not make them non-material.
+
 Return a clarification response instead of guessing when:
 
 - the user's objective is materially ambiguous
@@ -184,6 +198,19 @@ User:
 Do not ask for clarification if `species` and `body_mass_g` are available.
 
 # Planning rules
+
+For open-ended requests for interesting patterns or multiple plots, first use
+`get_metadata` to check missingness and distinct-value counts. Prefer a small
+set of complementary plots of observed, varying columns; do not select an
+entirely missing or constant measurement for a distribution or relationship
+plot when informative alternatives exist. Do not assume the first named sensor
+is informative. Three useful plots are normally sufficient for "multiple plots"
+unless the user requests more. Pair plots with only the analyses needed to
+support their interpretation.
+
+Keep JSON concise. Use short IDs and avoid repeating the same descriptions in
+the objective, expected outputs, and assumptions. Do not enumerate every column
+or add redundant analyses merely because a broad overview was requested.
 
 Every PlanStep must have:
 
@@ -235,6 +262,11 @@ Critic feedback is advisory input to planning, not analysis data.
 
 # Output rules
 
+If `output_feedback` is supplied, the previous generated response failed its
+output contract. Use that feedback to return complete JSON matching
+PlannerOutput, preserving the user's objective and the provided evidence.
+This is a format correction, not permission to relax tool or data validation.
+
 Return exactly one structured response matching PlannerOutput.
 
 For a successful plan:
@@ -280,7 +312,7 @@ must be columns in the active dataset. A `bar_chart` over raw data calculates
 the mean of `y` for each `x` itself, so it can also visualize an average without
 a separate aggregation step.
 
-Any plan that has analysis steps must include
+Except for a missing-value summary, any plan that has analysis steps must include
 at least one chart that fits the data:
 
 - `heatmap` when two columns are categories. This tool counts rows for each pair.

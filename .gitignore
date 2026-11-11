@@ -266,7 +266,10 @@ storybook-static/
 .vercel/
 
 # Local backend datasets
-/backend/data/
+/backend/data/*
+!/backend/data/demo_sales/
+/backend/data/demo_sales/*
+!/backend/data/demo_sales/sales_clean.csv
 
 # next.js build output
 .next

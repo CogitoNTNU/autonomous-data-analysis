@@ -40,9 +40,12 @@ def run_shared_preprocessing(
     result = run_preprocessing(
         PreprocessingInput(dataset=internal_dataset, steps=internal_steps)
     )
-    return _to_workflow_dataset(result.processed_dataset), _to_workflow_report(
-        result.report
+    processed = (
+        dataset.model_copy(deep=True)
+        if not steps
+        else _to_workflow_dataset(result.processed_dataset)
     )
+    return processed, _to_workflow_report(result.report)
 
 
 def _to_internal_dataset(dataset: WorkflowDatasetReference) -> DatasetReference:

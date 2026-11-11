@@ -8,7 +8,7 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.app.contracts.models import DatasetReference, WarningEvent
-from backend.app.tools.analysis.files import resolve_csv
+from backend.app.tools.analysis.files import read_frame
 from backend.app.tools.registry import Tool
 
 SOURCE = "correlation_analysis"
@@ -96,7 +96,7 @@ def run(dataset: DatasetReference, **kwargs: object) -> dict[str, object]:
             "min_periods": kwargs.get("min_periods", 2),
         }
     )
-    frame = pd.read_csv(resolve_csv(dataset.storage_ref), usecols=request.columns)
+    frame = read_frame(dataset, columns=request.columns)
     numeric = frame.apply(pd.to_numeric, errors="coerce")
     pairs: list[dict[str, object]] = []
     warnings = _column_warnings(numeric)

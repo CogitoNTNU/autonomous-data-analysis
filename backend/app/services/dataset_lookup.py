@@ -1,6 +1,7 @@
 """Find an uploaded CSV in this process, or restore it from the request."""
 
 from pathlib import Path
+from uuid import UUID
 
 from backend.app.services.uploads import store_named_csv
 from backend.app.storage.datasets import create_dataset_reference
@@ -17,6 +18,17 @@ def resolve_dataset(
     stored = paths.get(dataset_id)
     if stored is not None and stored.is_file():
         return stored
+    try:
+        identifier = UUID(dataset_id)
+    except ValueError:
+        raise ValueError("Unknown dataset") from None
+    if str(identifier) != dataset_id:
+        raise ValueError("Unknown dataset")
+    persisted = directory / f"{identifier}.csv"
+    if persisted.is_file():
+        create_dataset_reference(persisted)
+        paths[dataset_id] = persisted
+        return persisted
     csv = request.get("csv")
     if not isinstance(csv, str):
         raise ValueError("Unknown dataset")

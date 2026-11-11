@@ -27,6 +27,7 @@ export type WorkflowSnapshot = {
   dialogue: DialogueTurn[];
   analysisRound: number;
   acceptsMessages: boolean;
+  canRetryReview: boolean;
 };
 
 export type WorkflowStart = { datasetId: string; question: string; columns: string[] };
@@ -38,6 +39,7 @@ export type WorkflowClient = {
   status: (runId: string, signal?: AbortSignal) => Promise<WorkflowSnapshot>;
   resume: (input: WorkflowResume, signal?: AbortSignal) => Promise<WorkflowSnapshot>;
   message: (input: WorkflowMessage, signal?: AbortSignal) => Promise<WorkflowSnapshot>;
+  retryReview: (input: Pick<WorkflowResume, "runId" | "checkpointId">, signal?: AbortSignal) => Promise<WorkflowSnapshot>;
 };
 
 export const browserWorkflow: WorkflowClient = {
@@ -62,6 +64,11 @@ export const browserWorkflow: WorkflowClient = {
   async message(input, signal) {
     return mapWorkflow(await request("/api/workflows/messages", JSON.stringify({
       run_id: input.runId, checkpoint_id: input.checkpointId, message: input.message,
+    }), signal));
+  },
+  async retryReview(input, signal) {
+    return mapWorkflow(await request("/api/workflows/retry-review", JSON.stringify({
+      run_id: input.runId, checkpoint_id: input.checkpointId,
     }), signal));
   },
 };
@@ -95,6 +102,7 @@ export function mapWorkflow(value: unknown): WorkflowSnapshot {
     dialogue: mapDialogue(value.dialogue),
     analysisRound: round,
     acceptsMessages: value.accepts_messages === true,
+    canRetryReview: value.can_retry_review === true,
   };
 }
 

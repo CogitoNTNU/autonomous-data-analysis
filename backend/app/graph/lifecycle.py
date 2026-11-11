@@ -57,7 +57,9 @@ def _incomplete_reason(state: AgentState) -> str | None:
         return "Workflow ended without an analysis execution report."
     if report.outcome == "failed":
         return f"Analysis outcome '{report.outcome}' cannot complete this workflow."
-    if not state["analysis_results"]:
+    if report.outcome == "not_required" and not state["plan"].is_preprocessing_only:
+        return "Planned analysis cannot be marked as not required."
+    if not state["analysis_results"] and not state["plan"].is_preprocessing_only:
         return "Workflow ended without analysis results."
     if state["interpretation"] is None:
         return "Workflow ended without an interpretation."

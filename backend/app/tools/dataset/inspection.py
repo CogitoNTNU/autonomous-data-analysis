@@ -3,9 +3,10 @@
 from pathlib import Path
 
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from backend.app.contracts.models import DatasetReference
+from backend.app.storage.datasets import HOSTED_UPLOADS
 from backend.app.tools.registry import Tool, ToolRegistry
 
 
@@ -13,21 +14,28 @@ BACKEND = Path(__file__).resolve().parents[3]
 ALLOWED = (
     (BACKEND / "data").resolve(),
     (BACKEND / "tests" / "fixtures").resolve(),
+    HOSTED_UPLOADS.resolve(),
 )
 
 MAX_PREVIEW_ROWS = 20
 
+
 class PreviewDataInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     columns: list[str] | None = None
-    limit: int
+    limit: int = Field(ge=1, le=MAX_PREVIEW_ROWS)
+
 
 class GetMetadataInput(BaseModel):
-    pass
+    model_config = ConfigDict(extra="forbid")
+
 
 class InspectSchemaInput(BaseModel):
-    pass
+    model_config = ConfigDict(extra="forbid")
+
 
 class ColumnProfileInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     column: str
 
 
@@ -70,7 +78,6 @@ def get_metadata(
             "missing_count": int(series.isna().sum()),
             "unique_count": int(series.nunique()),
             "example_values": series.dropna().head(5).tolist(),
-
         }
         columns.append(column_info)
 
@@ -95,7 +102,6 @@ def inspect_schema(
     }
 
 
-
 def preview_data(
     dataset: DatasetReference,
     **kwargs: object,
@@ -108,15 +114,10 @@ def preview_data(
     limit = int(kwargs["limit"])
 
     if limit < 1 or limit > MAX_PREVIEW_ROWS:
-        raise ValueError(
-            f"limit must be between 1 and {MAX_PREVIEW_ROWS}"
-        )
+        raise ValueError(f"limit must be between 1 and {MAX_PREVIEW_ROWS}")
 
     if columns is not None:
-        missing_columns = [
-            col for col in columns
-            if col not in frame.columns
-        ]
+        missing_columns = [col for col in columns if col not in frame.columns]
 
         if missing_columns:
             raise ValueError(f"Unknown columns: {missing_columns}")
@@ -128,7 +129,7 @@ def preview_data(
     rows = preview.to_dict(orient="records")
     return {
         "rows": rows,
-        "returned_rows" : len(rows),
+        "returned_rows": len(rows),
     }
 
 
@@ -170,6 +171,7 @@ def column_profile(
         ],
         "warnings": [],
     }
+
 
 PREVIEW_DATA_TOOL = Tool(
     name="preview_data",

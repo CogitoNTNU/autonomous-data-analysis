@@ -114,6 +114,24 @@ def test_planner_rejects_invalid_plan():
     assert response.error.code == "INVALID_OUTPUT"
 
 
+def test_planner_rejects_metadata_only_plan_before_execution():
+    plan = make_valid_plan().model_copy(update={"analysis_steps": []})
+
+    response = run_planner(
+        "Which columns have missing values?",
+        make_dataset(),
+        [],
+        None,
+        default_registry(),
+        lambda prompt, context: PlannerOutput(plan=plan),
+    )
+
+    assert response.status == "error"
+    assert response.updates.plan is None
+    assert response.error.code == "INVALID_OUTPUT"
+    assert "at least one executable step" in response.error.message
+
+
 def test_planner_requests_clarification_for_independent_filtered_groups():
     plan = make_valid_plan().model_copy(
         update={

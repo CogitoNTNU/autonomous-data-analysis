@@ -8,7 +8,7 @@ from backend.app.agents.chat.schema import ChatContext, PresentedArtifact
 from backend.app.contracts.dialogue import DialogueTurn
 from backend.app.contracts.errors import AgentError
 from backend.app.contracts.state import AgentState
-from backend.app.core.exceptions import ModelProviderError
+from backend.app.core.exceptions import ModelConnectionError, ModelProviderError
 
 from .new_analysis import NewAnalysisUpdate, new_analysis_update
 
@@ -37,7 +37,12 @@ def dialogue_graph_node(
             extra={"run_id": state["run_id"], "error_category": failure.code},
         )
         turn = DialogueTurn(
-            role="assistant", content=FAILED_REPLY, analysis_round=current, failed=True
+            role="assistant",
+            content=failure.message
+            if isinstance(error, ModelConnectionError)
+            else FAILED_REPLY,
+            analysis_round=current,
+            failed=True,
         )
         return DialogueUpdate(
             dialogue=[*dialogue, turn], errors=[*state["errors"], failure]
@@ -78,7 +83,15 @@ def _context(state: AgentState, dialogue: list[DialogueTurn]) -> ChatContext:
 
 
 def _failure(error: Exception) -> AgentError:
-    if isinstance(error, TimeoutError):
+    if isinstance(error, ModelConnectionError):
+        code, message = (
+            "TOOL_FAILURE",
+            (
+                "Cannot connect to the model service. If using NTNU/IDUN, "
+                "connect to NTNU VPN or the NTNU network, then try again."
+            ),
+        )
+    elif isinstance(error, TimeoutError):
         code, message = "TIMEOUT", "The chat model did not respond in time."
     elif isinstance(error, ConnectionError):
         code, message = "TOOL_FAILURE", "The chat model could not be reached."
@@ -91,4 +104,7 @@ def _failure(error: Exception) -> AgentError:
         message=message,
         source="chat",
         retryable=isinstance(error, (TimeoutError, ConnectionError)),
+        details={"reason": "model_connection_failed"}
+        if isinstance(error, ModelConnectionError)
+        else {},
     )

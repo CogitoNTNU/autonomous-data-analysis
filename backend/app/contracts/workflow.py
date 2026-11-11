@@ -42,6 +42,10 @@ class SendMessage(WorkflowQuery):
     message: Question
 
 
+class RetryReview(WorkflowQuery):
+    checkpoint_id: str = Field(min_length=1)
+
+
 class FigurePreview(ContractModel):
     artifact_id: str
     image: str
@@ -86,3 +90,4 @@ class WorkflowSnapshot(ContractModel):
     dialogue: list[DialogueTurn] = Field(default_factory=list)
     analysis_round: int = Field(default=1, ge=1)
     accepts_messages: bool = False
+    can_retry_review: bool = False

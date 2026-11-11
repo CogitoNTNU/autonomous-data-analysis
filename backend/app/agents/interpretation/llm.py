@@ -1,6 +1,5 @@
 """OpenAI-compatible Chat Completions adapter using structured output."""
 
-from math import isfinite
 from typing import Any
 
 from openai import (
@@ -15,7 +14,9 @@ from pydantic import ValidationError
 
 from backend.app.contracts.models import Interpretation
 from backend.app.core.llm_config import CompletionOptions, IDUN_TIMEOUT_SECONDS
-from backend.app.core.llm_errors import raise_provider_error
+from backend.app.core.llm_errors import raise_model_timeout, raise_provider_error
+from backend.app.core.llm_transport import model_timeout
+from backend.app.core.exceptions import ModelConnectionError
 
 from .context import serialize_context
 from .schema import InterpretationContext
@@ -41,9 +42,9 @@ class InterpretationLLM:
     ) -> None:
         if not model_name.strip():
             raise ValueError("A model name is required")
-        if not isfinite(timeout_seconds) or timeout_seconds <= 0:
-            raise ValueError("Model timeout must be finite and positive")
-        self._client = client.with_options(max_retries=0, timeout=timeout_seconds)
+        self._client = client.with_options(
+            max_retries=0, timeout=model_timeout(timeout_seconds)
+        )
         self._model_name = model_name
         self._completion = completion or CompletionOptions()
 
@@ -67,9 +68,9 @@ class InterpretationLLM:
                 **self._completion.request_kwargs(),
             )
         except APITimeoutError as error:
-            raise TimeoutError("The interpretation model timed out") from error
+            raise_model_timeout(error, "interpretation")
         except APIConnectionError as error:
-            raise ConnectionError(
+            raise ModelConnectionError(
                 "The interpretation provider is unreachable"
             ) from error
         except APIStatusError as error:

@@ -24,8 +24,10 @@ export function usePlannerSession(client: WorkflowClient = browserWorkflow) {
   const seen = useRef<WorkflowSnapshot | null>(null);
   const active = useRef<{ controller: AbortController; timer?: ReturnType<typeof setTimeout> } | null>(null);
   const upload = useRef(0);
+  const retryingReview = useRef(false);
 
   function cancelRequests() {
+    retryingReview.current = false;
     active.current?.controller.abort();
     clearTimeout(active.current?.timer);
     active.current = null;
@@ -77,8 +79,8 @@ export function usePlannerSession(client: WorkflowClient = browserWorkflow) {
     setRounds((current) => archiveRound(current, previous, result));
     setWorkflow(result);
     setError(result.error);
-    if (result.status === "error") { setPhase("error"); return; }
-    if (result.status === "completed") { setPhase("complete"); return; }
+    if (result.status === "error") { retryingReview.current = false; setPhase("error"); return; }
+    if (result.status === "completed") { retryingReview.current = false; setPhase("complete"); return; }
     if (result.status === "needs_clarification") { setPhase("clarification_input"); return; }
     setPhase(result.activeAgent && result.activeAgent !== "planner" ? result.activeAgent : "thinking");
     if (active.current) active.current.timer = setTimeout(() => {
@@ -89,6 +91,7 @@ export function usePlannerSession(client: WorkflowClient = browserWorkflow) {
   }
   function fail(reason: unknown, controller: AbortController) {
     if (controller.signal.aborted) return;
+    retryingReview.current = false;
     setError(messageFrom(reason));
     setPhase("error");
   }
@@ -122,6 +125,18 @@ export function usePlannerSession(client: WorkflowClient = browserWorkflow) {
     if (option.id === "custom") { setPhase("clarification_input"); return; }
     submitQuestion(option.label);
   }
+  function retryReview() {
+    if (retryingReview.current || phase !== "error" || !workflow?.canRetryReview) return;
+    cancelRequests();
+    retryingReview.current = true;
+    const controller = new AbortController();
+    active.current = { controller };
+    setError(null);
+    setPhase("critic");
+    void client.retryReview({ runId: workflow.runId, checkpointId: workflow.checkpointId }, controller.signal)
+      .then((result) => observe(result, controller))
+      .catch((reason: unknown) => fail(reason, controller));
+  }
   const clarification: ClarificationRequest | null = workflow?.question ? {
     reason: "missing_information", question: workflow.question,
     description: "Answer in the message field so the analysis can proceed.", options: [],
@@ -133,9 +148,10 @@ export function usePlannerSession(client: WorkflowClient = browserWorkflow) {
     error, errorAgent: agents[workflow?.activeAgent ?? "planner"],
     rounds, dialogue: workflow?.dialogue ?? [], analysisRound: workflow?.analysisRound ?? 1,
     acceptsMessages: workflow?.status === "completed" && workflow.acceptsMessages,
+    canRetryReview: phase === "error" && workflow?.canRetryReview === true,
     pendingMessage: pending && (workflow?.dialogue.length ?? 0) <= pending.after ? pending.text : null,
     busy: ["thinking", "preprocessing", "analysis", "interpretation", "critic", "chat"].includes(phase),
-    acceptDataset, submitQuestion, answerClarification, resetQuestion, replaceDataset, editQuestion,
+    acceptDataset, submitQuestion, answerClarification, resetQuestion, replaceDataset, editQuestion, retryReview,
   };
 }
 

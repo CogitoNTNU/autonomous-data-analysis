@@ -52,6 +52,10 @@ class Plan(ContractModel):
     expected_outputs: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
 
+    @property
+    def is_preprocessing_only(self) -> bool:
+        return bool(self.preprocessing_steps) and not self.analysis_steps
+
 
 class PreprocessingReport(ContractModel):
     changes: list[str] = Field(default_factory=list)
@@ -140,6 +144,8 @@ class RunControl(ContractModel):
     max_revisions: int = Field(default=2, ge=0)
     retry_count: int = Field(default=0, ge=0)
     max_retries: int = Field(default=2, ge=0)
+    output_repair_count: int = Field(default=0, ge=0)
+    max_output_repairs: int = Field(default=2, ge=0, le=3)
 
 
 class PlannerUpdates(ContractModel):
@@ -155,9 +161,10 @@ class AnalysisExecutionReport(ContractModel):
     """Step execution outcome; complete does not imply Critic approval.
 
     A failed report with no step outcomes represents rejection before execution.
+    A not_required report records that a preprocessing-only plan has no analysis.
     """
 
-    outcome: Literal["complete", "partial", "failed"]
+    outcome: Literal["complete", "partial", "failed", "not_required"]
     completed_step_ids: list[NonEmptyString] = Field(default_factory=list)
     failed_step_ids: list[NonEmptyString] = Field(default_factory=list)
     skipped_step_ids: list[NonEmptyString] = Field(default_factory=list)
@@ -167,6 +174,10 @@ class AnalysisExecutionReport(ContractModel):
         ids = self.completed_step_ids + self.failed_step_ids + self.skipped_step_ids
         if len(ids) != len(set(ids)):
             raise ValueError("Step outcomes must be unique and disjoint")
+        if self.outcome == "not_required":
+            if ids:
+                raise ValueError("Unneeded analysis cannot contain step outcomes")
+            return self
         expected = (
             "failed"
             if not self.completed_step_ids

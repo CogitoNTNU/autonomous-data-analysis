@@ -42,6 +42,7 @@ def run_preprocessing(input_data: PreprocessingInput) -> PreprocessingOutput:
     affected_columns: set[str] = set()
     warnings: list[str] = []
     made_changes = False
+    declared_types: dict[str, str] = {}
     for step in _order_steps(input_data.steps):
         try:
             execution = execute_preprocessing_tool(
@@ -50,6 +51,7 @@ def run_preprocessing(input_data: PreprocessingInput) -> PreprocessingOutput:
         except PreprocessingToolError as error:
             raise PreprocessingStepError(step.step_id, step.tool_name, error) from error
         rows = execution.rows
+        declared_types.update(execution.output_datatypes)
         if execution.fieldnames is not None:
             fieldnames = execution.fieldnames
         made_changes = made_changes or (
@@ -71,6 +73,10 @@ def run_preprocessing(input_data: PreprocessingInput) -> PreprocessingOutput:
 
     output_uri, output_hash = write_csv(dataset.uri, fieldnames, rows)
     output_version = f"preprocessed-{output_hash[:12]}"
+    metadata = build_metadata(fieldnames, rows)
+    for column in metadata.columns:
+        if column.name in declared_types:
+            column.data_type = declared_types[column.name]
     processed_dataset = DatasetReference(
         dataset_id=dataset.dataset_id,
         version=output_version,
@@ -78,7 +84,7 @@ def run_preprocessing(input_data: PreprocessingInput) -> PreprocessingOutput:
         format=dataset.format,
         content_hash=output_hash,
         parent_version=dataset.version,
-        metadata=build_metadata(fieldnames, rows),
+        metadata=metadata,
     )
     return PreprocessingOutput(
         processed_dataset=processed_dataset,

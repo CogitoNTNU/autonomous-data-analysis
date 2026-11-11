@@ -15,6 +15,7 @@ from backend.app.services.plan_payload import load_plan
 from backend.app.services.preprocessing_request import prepare_dataset
 from backend.app.storage.datasets import BACKEND, HOSTED_UPLOADS
 from backend.app.tools.visualization.load import DEFAULT_ARTIFACTS, HOSTED_ARTIFACTS
+from backend.app.tools.analysis.descriptive import default_registry
 
 READABLE_FIGURES = (
     DEFAULT_ARTIFACTS.resolve(),
@@ -41,7 +42,7 @@ def analyze_plan(
     state = create_initial_state(plan.objective, dataset)
     state["plan"] = plan
     state["processed_dataset"] = processed
-    response = analysis_node(state)
+    response = analysis_node(state, registry=default_registry(isolate_execution=True))
     if response.status != "success":
         message = response.error.message if response.error is not None else ""
         raise ValueError(message or "Analysis could not run")

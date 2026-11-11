@@ -7,7 +7,7 @@ const figure = { id: "f1", image: "data:image/png;base64,abc" };
 const completed: WorkflowSnapshot = {
   runId: "run-1", checkpointId: "c1", status: "completed", activeAgent: null, question: null, plan: null, report: null,
   analysis: { steps: [], figures: [figure], warnings: [], results: [], artifacts: [] },
-  interpretation: null, critique: null, answer, error: null, dialogue: [], analysisRound: 1, acceptsMessages: true,
+  interpretation: null, critique: null, answer, error: null, dialogue: [], analysisRound: 1, acceptsMessages: true, canRetryReview: false,
 };
 const nextRound: WorkflowSnapshot = { ...completed, status: "running", analysis: null, answer: null, analysisRound: 2 };
 

@@ -83,20 +83,28 @@ def test_evidence_matches_real_tool_outputs(tmp_path, monkeypatch) -> None:
 
 
 def test_provider_payload_has_warnings_without_evaluation_labels(monkeypatch) -> None:
+    from openai.types.chat import ChatCompletion
+
     case = build_cases()[-1]
     captured = []
 
     def completion(**kwargs):
         captured.append(json.loads(kwargs["messages"][1]["content"]))
-        return SimpleNamespace(
+        return ChatCompletion(
+            id="review-1",
+            created=0,
+            model="test",
+            object="chat.completion",
             choices=[
-                SimpleNamespace(
-                    finish_reason="stop",
-                    message=SimpleNamespace(
-                        content=Critique(decision="approved").model_dump_json()
-                    ),
-                )
-            ]
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": Critique(decision="approved").model_dump_json(),
+                    },
+                },
+            ],
         )
 
     for name, value in {
@@ -124,6 +132,7 @@ def test_provider_payload_has_warnings_without_evaluation_labels(monkeypatch) ->
         "preprocessing_report",
         "analysis_execution_report",
         "warnings",
+        "output_feedback",
     }
     assert case.name not in json.dumps(payload)
     assert case.review_note not in json.dumps(payload)

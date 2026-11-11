@@ -56,8 +56,14 @@ def _draw(ax: Axes, table: pd.Series | pd.DataFrame) -> None:
         or pd.api.types.is_string_dtype(table.index)
         or isinstance(table.index, pd.CategoricalIndex)
     ):
-        # Explicit positions keep identically displayed category names distinct.
-        ax.set_xticks(range(len(table.index)), labels=list(table.index))
+        # Keep all observations, but bound text rendering on long category axes.
+        count = min(len(table.index), 12)
+        positions = (
+            [0]
+            if count == 1
+            else [round(i * (len(table.index) - 1) / (count - 1)) for i in range(count)]
+        )
+        ax.set_xticks(positions, labels=[table.index[i] for i in positions])
 
 
 def _table(frame: pd.DataFrame, spec: YNumericAxesInput) -> pd.Series | pd.DataFrame:

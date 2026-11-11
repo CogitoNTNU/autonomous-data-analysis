@@ -13,6 +13,9 @@ FIELDS = (
     "duration_seconds",
     "error_category",
     "critic_decision",
+    "output_reason",
+    "output_repair_count",
+    "validation_types",
 )
 
 

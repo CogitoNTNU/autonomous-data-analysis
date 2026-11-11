@@ -2,7 +2,12 @@
 
 from backend.app.agents.analysis.agent import run_analysis
 from backend.app.contracts.errors import AgentError
-from backend.app.contracts.models import AnalysisUpdates, Plan, PlanStep
+from backend.app.contracts.models import (
+    AnalysisExecutionReport,
+    AnalysisUpdates,
+    Plan,
+    PlanStep,
+)
 from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import AgentState
 from backend.app.tools.registry import ToolRegistry
@@ -26,6 +31,14 @@ def analysis_node(
                 message="Analysis requires a plan and processed dataset.",
                 source="analysis",
                 retryable=False,
+            ),
+        )
+
+    if plan.is_preprocessing_only and state["preprocessing_report"] is not None:
+        return AgentResponse[AnalysisUpdates](
+            status="success",
+            updates=AnalysisUpdates(
+                execution_report=AnalysisExecutionReport(outcome="not_required")
             ),
         )
 

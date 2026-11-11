@@ -252,6 +252,10 @@ def change_datatypes(
         dropped_rows + changed_rows,
         f"Converted datatypes for {', '.join(conversions)}",
         warnings,
+        output_datatypes={
+            column: "float" if datatype == "currency" else datatype
+            for column, datatype in conversions.items()
+        },
     )
 
 

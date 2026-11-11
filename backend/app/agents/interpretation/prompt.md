@@ -1,5 +1,10 @@
 # Interpretation Agent
 
+For a preprocessing-only plan, explain the recorded preprocessing report in the
+summary. Return an empty findings list because no analysis result IDs exist.
+Preserve report warnings and plan assumptions. Do not invent statistical results
+or add analyses the user did not request.
+
 ## Role
 
 Explain the supplied analysis evidence in relation to the user's question and

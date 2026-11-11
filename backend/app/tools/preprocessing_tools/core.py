@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -62,6 +62,7 @@ class ToolExecution:
     quality_warnings: list[str]
     fieldnames: list[str] | None = None
     changed: bool | None = None
+    output_datatypes: dict[str, str] = field(default_factory=dict)
 
 
 class ToolArguments(BaseModel):

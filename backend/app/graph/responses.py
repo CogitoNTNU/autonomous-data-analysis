@@ -28,6 +28,7 @@ from backend.app.contracts.responses import AgentResponse, ResponseStatus
 from backend.app.contracts.state import AgentState
 
 from .limits import can_retry
+from .output_repair import can_repair_output
 from .preprocessing_repair import is_preprocessing_repair
 from .updates import outcome_updates
 
@@ -107,7 +108,9 @@ def translate_agent_response(
     outcome["warnings"] = _merge_warnings(state, response, source)
     # A pending retry must see exactly the same domain inputs (including revision
     # feedback and the previous draft). The active error prevents forward routing.
-    if can_retry(outcome["last_node_error"], outcome["control"]):
+    if can_retry(outcome["last_node_error"], outcome["control"]) or can_repair_output(
+        outcome["last_node_error"], outcome["control"]
+    ):
         return {**outcome, "final_response": None}
 
     # Replaced upstream work invalidates every dependent output.
@@ -143,7 +146,21 @@ def translate_agent_response(
 def _merge_warnings(
     state: AgentState, response: AgentResponse[UpdatesT], source: AgentName
 ) -> list[WarningEvent]:
-    warnings = list(state["warnings"])
+    replaced: list[WarningEvent] = []
+    if response.status == "success":
+        if source in {"planner", "preprocessing"}:
+            report = state["preprocessing_report"]
+            if report is not None:
+                replaced.extend(report.warnings)
+        if source in {"planner", "preprocessing", "analysis"}:
+            replaced.extend(
+                warning
+                for result in state["analysis_results"]
+                for warning in result.warnings
+            )
+    # Warnings follow their evidence. Superseded executions remain in durable
+    # checkpoints; their warnings must not be forced into the current answer.
+    warnings = [warning for warning in state["warnings"] if warning not in replaced]
     candidates = response.warnings
     if source == "interpretation":
         # Interpretation returns sanitized projections of existing evidence warnings.

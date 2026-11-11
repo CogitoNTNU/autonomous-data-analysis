@@ -14,6 +14,7 @@ from backend.app.contracts.responses import AgentResponse, ResponseStatus
 from backend.app.contracts.state import AgentState
 
 from .preprocessing_repair import is_preprocessing_repair
+from .output_repair import is_output_failure
 
 UpdatesT = TypeVar("UpdatesT", bound=ContractModel)
 
@@ -79,6 +80,12 @@ def outcome_updates(
             "status": "running" if response.status == "success" else response.status,
             "retry_count": previous.retry_count + 1 if retry else 0,
             "revision_count": previous.revision_count + int(revision),
+            "output_repair_count": (
+                previous.output_repair_count
+                + int(is_output_failure(state["last_node_error"]))
+                if previous.current_agent == agent
+                else 0
+            ),
         }
     )
     errors = list(state["errors"])

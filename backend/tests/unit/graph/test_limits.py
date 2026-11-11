@@ -8,7 +8,16 @@ from backend.app.contracts.models import RunControl
 from backend.app.graph.limits import can_retry, workflow_recursion_limit
 
 
-@pytest.mark.parametrize("field", ["retry_count", "max_retries", "max_revisions"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "retry_count",
+        "max_retries",
+        "max_revisions",
+        "output_repair_count",
+        "max_output_repairs",
+    ],
+)
 def test_limits_reject_negative_values(field):
     with pytest.raises(ValidationError):
         RunControl.model_validate({field: -1})
@@ -32,3 +41,10 @@ def test_permanent_categories_cannot_be_retried_even_if_mislabeled(code):
 def test_recursion_budget_covers_all_node_retries_and_upstream_revisions():
     control = RunControl(max_revisions=3, max_retries=2)
     assert workflow_recursion_limit(control) > 2 + 5 * 4 * 3
+
+
+def test_output_corrections_are_bounded_and_included_in_recursion_budget():
+    with pytest.raises(ValidationError):
+        RunControl(max_output_repairs=4)
+    control = RunControl(max_revisions=3, max_retries=2, max_output_repairs=3)
+    assert workflow_recursion_limit(control) > 2 + (5 + 3) * 4 * 3

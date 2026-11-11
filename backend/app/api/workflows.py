@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from backend.app.contracts.workflow import (
     ResumeWorkflow,
+    RetryReview,
     SendMessage,
     StartWorkflow,
     WorkflowQuery,
@@ -23,6 +24,7 @@ ROUTES = {
     "/api/workflows/status",
     "/api/workflows/resume",
     "/api/workflows/messages",
+    "/api/workflows/retry-review",
 }
 
 
@@ -44,6 +46,8 @@ def dispatch_workflow(
             result = app.workflows.resume(ResumeWorkflow.model_validate_json(body))
         elif path == "/api/workflows/messages":
             result = app.workflows.message(SendMessage.model_validate_json(body))
+        elif path == "/api/workflows/retry-review":
+            result = app.workflows.retry_review(RetryReview.model_validate_json(body))
         else:
             result = app.workflows.status(
                 WorkflowQuery.model_validate_json(body).run_id

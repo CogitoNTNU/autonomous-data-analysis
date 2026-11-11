@@ -14,6 +14,7 @@ from backend.app.services.analysis_request import (
     public_result,
 )
 from backend.app.services.interrupt_kinds import interrupt_kinds
+from backend.app.services.workflow_review import can_retry_review
 
 
 def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnapshot:
@@ -98,6 +99,7 @@ def workflow_snapshot(snapshot: StateSnapshot, *, running: bool) -> WorkflowSnap
         dialogue=state.get("dialogue", []),
         analysis_round=state.get("analysis_round", 1),
         accepts_messages=not running and "message" in interrupt_kinds(snapshot),
+        can_retry_review=not running and can_retry_review(state),
     )
 
 
@@ -108,6 +110,36 @@ def _public_error(error: AgentError | None) -> AgentError | None:
     # Harness messages are authored locally and contain no provider diagnostics.
     if error.source == "harness":
         return error.model_copy(update={"details": {}})
+    if error.details.get("reason") == "model_connection_failed":
+        return error.model_copy(
+            update={
+                "details": {},
+                "message": (
+                    "Cannot connect to the model service. If using NTNU/IDUN, "
+                    "connect to NTNU VPN or the NTNU network, then try again."
+                ),
+            }
+        )
+    if error.source == "critic" and error.code == "INVALID_OUTPUT":
+        return error.model_copy(
+            update={
+                "details": {},
+                "message": (
+                    "The review service returned an invalid response. Your analysis "
+                    "is saved. Retry the review to finish checking the answer."
+                ),
+            }
+        )
+    if (
+        error.source == "planner"
+        and error.details.get("reason") == "model_output_invalid"
+    ):
+        return error.model_copy(
+            update={
+                "details": {},
+                "message": "The Planner could not return a complete valid plan after correction. Your dataset is saved. Please submit the question again.",
+            }
+        )
     if error.code == "TIMEOUT":
         return error.model_copy(
             update={

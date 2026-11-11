@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { Button } from "@/components/ui/button";
 import { AgentTurn } from "@/features/analysis-chat/AgentTurn";
 import { agents } from "@/features/analysis-chat/agents";
 import { AnalysisStages } from "@/features/analysis-chat/AnalysisStages";
@@ -12,6 +13,7 @@ import type { AnalysisRound } from "@/types/dialogue";
 type Session = Pick<ReturnType<typeof usePlannerSession>,
   "busy" | "phase" | "plan" | "report" | "analysis" | "interpretation" | "critique" | "answer" | "error"
   | "rounds" | "dialogue" | "analysisRound" | "acceptsMessages" | "pendingMessage" | "submitQuestion"
+  | "canRetryReview" | "retryReview"
 >;
 
 function stagesOf(round: AnalysisRound) {
@@ -53,6 +55,9 @@ export function WorkflowTurns({ session }: { session: Session }) {
       {session.phase === "error" && session.error && (
         <AgentTurn agent={agents.assistant}>
           <p className="text-base leading-7 text-destructive" role="alert">{session.error}</p>
+          {session.canRetryReview && (
+            <Button className="mt-3" variant="outline" onClick={session.retryReview}>Retry review</Button>
+          )}
         </AgentTurn>
       )}
     </>

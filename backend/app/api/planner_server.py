@@ -112,7 +112,8 @@ def make_app(
 ) -> PlannerApp:
     return PlannerApp(
         upload_directory() if directory is None else directory,
-        registry or register_preprocessing_tools(default_registry()),
+        registry
+        or register_preprocessing_tools(default_registry(isolate_execution=True)),
         model_factory or _live_model,
     )
 
@@ -187,6 +188,8 @@ def _body(handler: PlannerHandler) -> bytes:
         raise ValueError("Missing request body") from exc
     if length < 0:
         raise ValueError("Missing request body")
+    if length > MAX_BODY_BYTES:
+        raise ValueError("The request is too large")
     return handler.rfile.read(length)
 
 

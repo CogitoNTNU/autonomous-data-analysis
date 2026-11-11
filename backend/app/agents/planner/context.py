@@ -27,6 +27,8 @@ def context_message(context: PlannerContext, registry: ToolRegistry) -> str:
         else None,
     }
     preview = _cleaning_preview(context, registry)
+    if context.output_feedback is not None:
+        data["output_feedback"] = context.output_feedback
     if preview is not None:
         data["dataset_preview"] = preview
     return json.dumps(data, default=str)

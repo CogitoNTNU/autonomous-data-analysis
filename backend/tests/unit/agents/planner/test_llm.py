@@ -8,8 +8,9 @@ from unittest.mock import Mock
 import pytest
 
 from backend.app.agents.planner.agent import PlannerContext
-from backend.app.agents.planner.llm import MAX_TOOL_ROUNDS, PlannerLLM
+from backend.app.agents.planner.llm import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, PlannerLLM
 from backend.app.contracts.models import DatasetReference
+from backend.app.core.exceptions import ModelOutputError
 from backend.app.tools.dataset.inspection import inspection_registry
 from backend.app.tools.registry import ToolRegistry
 
@@ -159,6 +160,45 @@ def test_invalid_responses_fail_once_without_attempting_plan_repair(
     create.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    "choice,reason",
+    [
+        (_choice(content="not JSON"), "invalid_json"),
+        (_choice(content=""), "empty_response"),
+        (_choice(finish_reason="length"), "incomplete_response"),
+        (_choice(content=None), "empty_response"),
+    ],
+)
+def test_output_failures_have_safe_categories_for_harness_correction(
+    adapter, context, choice, reason
+):
+    model, create = adapter
+    create.return_value = SimpleNamespace(choices=[choice])
+
+    with pytest.raises(ModelOutputError) as raised:
+        model("Plan", context)
+
+    assert raised.value.reason == reason
+    create.assert_called_once()
+
+
+def test_output_feedback_reaches_the_provider_without_changing_objective(
+    adapter, context
+):
+    model, create = adapter
+    context = replace(
+        context,
+        output_feedback="Previous response was incomplete. Return concise complete JSON.",
+    )
+    create.return_value = SimpleNamespace(choices=[_choice()])
+
+    model("Plan", context)
+
+    payload = json.loads(create.call_args.kwargs["messages"][1]["content"])
+    assert payload["user_query"] == context.user_query
+    assert payload["output_feedback"] == context.output_feedback
+
+
 def _tool_call(name="get_metadata", arguments="{}"):
     payload = {
         "id": "inspect-1",
@@ -219,10 +259,58 @@ def test_inspection_round_limit_is_unchanged(adapter, context):
         ]
     )
 
-    with pytest.raises(RuntimeError, match="maximum number of tool rounds"):
+    with pytest.raises(ValueError, match="maximum number of tool rounds"):
         model("Plan the analysis.", context)
 
-    assert create.call_count == MAX_TOOL_ROUNDS
+    assert create.call_count == MAX_TOOL_ROUNDS + 1
+    assert create.call_args.kwargs["tool_choice"] == "none"
+    assert registry.get("get_metadata").run.call_count == MAX_TOOL_ROUNDS
+
+
+def test_inspection_budget_reserves_a_final_response_slot(adapter, context):
+    model, create = adapter
+    inspect = Mock(return_value={"row_count": 3})
+    registry = ToolRegistry()
+    registry.register(
+        replace(model.inspection_registry.get("get_metadata"), run=inspect)
+    )
+    model.inspection_registry = registry
+    inspection = SimpleNamespace(
+        choices=[
+            _choice(content=None, tool_calls=[_tool_call()], finish_reason="tool_calls")
+        ]
+    )
+    create.side_effect = [
+        *[inspection for _ in range(MAX_TOOL_ROUNDS)],
+        SimpleNamespace(choices=[_choice()]),
+    ]
+
+    output = model("Plan the analysis.", context)
+
+    assert output.clarification is not None
+    assert inspect.call_count == MAX_TOOL_ROUNDS
+    assert create.call_count == MAX_TOOL_ROUNDS + 1
+    assert create.call_args.kwargs["tool_choice"] == "none"
+
+
+def test_plan_schema_only_names_registered_executable_tools(adapter, context):
+    model, create = adapter
+    context = replace(
+        context,
+        available_tools=[
+            {"name": "get_metadata", "phase": "inspection"},
+            {"name": "descriptive_statistics", "phase": "analysis"},
+            {"name": "remove_duplicates", "phase": "preprocessing"},
+        ],
+    )
+    create.return_value = SimpleNamespace(choices=[_choice()])
+
+    model("Plan the analysis.", context)
+
+    names = create.call_args.kwargs["response_format"]["json_schema"]["schema"][
+        "$defs"
+    ]["PlanStep"]["properties"]["tool_name"]["enum"]
+    assert names == ["descriptive_statistics", "remove_duplicates"]
 
 
 @pytest.mark.parametrize(
@@ -242,3 +330,49 @@ def test_unregistered_or_invalid_inspections_are_rejected(adapter, context, tool
         model("Plan the analysis.", context)
 
     create.assert_called_once()
+
+
+def test_single_response_cannot_bypass_inspection_budget(adapter, context):
+    model, create = adapter
+    inspect = Mock(return_value={})
+    registry = ToolRegistry()
+    registry.register(
+        replace(model.inspection_registry.get("get_metadata"), run=inspect)
+    )
+    model.inspection_registry = registry
+    create.return_value = SimpleNamespace(
+        choices=[
+            _choice(
+                content=None,
+                tool_calls=[_tool_call() for _ in range(MAX_TOOL_CALLS + 1)],
+                finish_reason="tool_calls",
+            )
+        ]
+    )
+
+    with pytest.raises(ValueError, match="inspection-call budget"):
+        model("Plan", context)
+
+    assert inspect.call_count == MAX_TOOL_CALLS
+
+
+def test_planner_rejects_registered_noninspection_tool(adapter, context):
+    model, create = adapter
+    run = Mock()
+    registry = ToolRegistry()
+    registry.register(
+        replace(
+            model.inspection_registry.get("get_metadata"), phase="analysis", run=run
+        )
+    )
+    model.inspection_registry = registry
+    create.return_value = SimpleNamespace(
+        choices=[
+            _choice(content=None, tool_calls=[_tool_call()], finish_reason="tool_calls")
+        ]
+    )
+
+    with pytest.raises(ValueError, match="only execute inspection"):
+        model("Plan", context)
+
+    run.assert_not_called()

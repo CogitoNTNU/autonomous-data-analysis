@@ -211,7 +211,17 @@ def test_graph_stops_before_analysis_on_preprocessing_failure(exception):
         storage_ref="unused.csv",
         schema={"age": {"datatype": "integer"}},
     )
-    plan = Plan(plan_id="plan-1", objective="Describe age.")
+    plan = Plan(
+        plan_id="plan-1",
+        objective="Describe age.",
+        analysis_steps=[
+            PlanStep(
+                step_id="describe",
+                tool_name="descriptive_statistics",
+                arguments={"columns": ["age"]},
+            )
+        ],
+    )
     planner_model = Mock(return_value=PlannerOutput(plan=plan))
     interpretation_model = Mock()
     state = create_initial_state("Describe age.", dataset)

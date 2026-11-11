@@ -171,6 +171,27 @@ def _source_result_problem(
         return "INVALID_DATA", f"Unknown source_result_id: {source_result_id}"
     if isinstance(source.values, dict) and source.values.get("status") == "failed":
         return "DEPENDENCY_FAILED", f"Source result failed: {source_result_id}"
+    if step.tool_name in VISUALIZATION_TOOL_NAMES:
+        columns = {
+            column
+            for name in ("x", "y", "group")
+            if isinstance(column := step.arguments.get(name), str)
+        }
+        if (
+            source.step_id not in step.depends_on
+            or source.method != "group_aggregate"
+            or not isinstance(source.values, dict)
+            or not isinstance(source.values.get("groups"), list)
+            or not columns
+            <= (
+                set(source.parameters.get("group_by", []))
+                | set(group_aggregate_schema(source.parameters, {}))
+            )
+        ):
+            return (
+                "INVALID_DATA",
+                "Chart source must be a compatible aggregation dependency",
+            )
     return None
 
 
@@ -186,13 +207,17 @@ def _dependency_input(
         for name in ("x", "y", "group")
         if isinstance(column := step.arguments.get(name), str)
     }
-    if columns <= set(dataset.dataset_schema):
-        return dataset, None
+    requested_source = step.arguments.get("source_result_id")
     for dependency in step.depends_on:
         source = next(
             (result for result in results if result.step_id == dependency), None
         )
         if source is None or not isinstance(source.values, dict):
+            continue
+        if requested_source is not None and requested_source not in {
+            source.result_id,
+            source.step_id,
+        }:
             continue
         rows = source.values.get("groups")
         if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):

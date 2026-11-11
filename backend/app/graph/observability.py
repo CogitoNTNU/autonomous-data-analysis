@@ -30,6 +30,7 @@ def measured_node(
             "retry_count": retry_count,
             "attempt": retry_count + 1,
             "revision_count": state["control"].revision_count,
+            "output_repair_count": state["control"].output_repair_count,
         }
         logger.info("workflow.node_started", extra=fields)
         started = perf_counter()
@@ -52,6 +53,12 @@ def measured_node(
                 **fields,
                 "duration_seconds": round(perf_counter() - started, 3),
                 "error_category": error.code if isinstance(error, AgentError) else None,
+                "output_reason": error.details.get("output_reason")
+                if isinstance(error, AgentError)
+                else None,
+                "validation_types": error.details.get("validation_types")
+                if isinstance(error, AgentError)
+                else None,
             },
         )
         return updates

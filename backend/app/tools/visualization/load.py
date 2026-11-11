@@ -56,7 +56,12 @@ def read_dataset(
 ) -> pd.DataFrame:
     if source_rows is not None:
         return pd.DataFrame.from_records(source_rows)
-    return pd.read_csv(dataset_path(dataset.storage_ref))
+    dtypes = {
+        name: "string"
+        for name, info in dataset.dataset_schema.items()
+        if isinstance(info, dict) and info.get("datatype") in {"string", "date"}
+    }
+    return pd.read_csv(dataset_path(dataset.storage_ref), dtype=dtypes)
 
 
 def prepare_numeric(

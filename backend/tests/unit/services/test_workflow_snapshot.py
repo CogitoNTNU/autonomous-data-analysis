@@ -41,3 +41,19 @@ def test_public_error_keeps_unknown_diagnostics_generic() -> None:
     assert public is not None
     assert public.message == "The preprocessing stage failed (TOOL_FAILURE)."
     assert public.details == {}
+
+
+def test_public_connection_error_explains_network_requirement_without_raw_details():
+    error = AgentError(
+        code="TOOL_FAILURE",
+        source="planner",
+        message="private error",
+        retryable=True,
+        details={"reason": "model_connection_failed", "private": "secret"},
+    )
+
+    public = _public_error(error)
+
+    assert "NTNU VPN" in public.message
+    assert public.details == {}
+    assert "private" not in public.model_dump_json()

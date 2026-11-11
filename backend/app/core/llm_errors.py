@@ -2,9 +2,16 @@
 
 from typing import NoReturn
 
-from openai import APIStatusError
+from httpx2 import ConnectTimeout
+from openai import APIStatusError, APITimeoutError
 
-from backend.app.core.exceptions import ModelProviderError
+from backend.app.core.exceptions import ModelConnectionError, ModelProviderError
+
+
+def raise_model_timeout(error: APITimeoutError, source: str) -> NoReturn:
+    if isinstance(error.__cause__, ConnectTimeout):
+        raise ModelConnectionError(f"The {source} provider is unreachable") from error
+    raise TimeoutError(f"The {source} model timed out") from error
 
 
 def raise_provider_error(error: APIStatusError, source: str) -> NoReturn:

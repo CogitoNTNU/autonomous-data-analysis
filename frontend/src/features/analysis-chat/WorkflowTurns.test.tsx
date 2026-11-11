@@ -6,7 +6,7 @@ import { createPrototypeAnalysisPlan } from "@/features/analysis-chat/prototype-
 
 type Session = Parameters<typeof WorkflowTurns>[0]["session"];
 const session: Session = {
-  busy: false, phase: "complete", error: null,
+  busy: false, phase: "complete", error: null, canRetryReview: false, retryReview: () => {},
   plan: createPrototypeAnalysisPlan("Compare body mass"),
   report: { rowsBefore: 344, rowsAfter: 342, changes: ["Removed two incomplete rows."], affectedColumns: [], warnings: [] },
   analysis: null,
@@ -86,5 +86,18 @@ describe("chronological workflow transcript", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("did not respond in time");
     expect(screen.queryByRole("status")).toBeNull();
     follows("Critic approved", "The model service did not respond in time.");
+  });
+
+  it("offers keyboard-accessible review recovery while keeping completed stages", async () => {
+    const user = userEvent.setup();
+    const retryReview = vi.fn();
+    render(<WorkflowTurns session={{ ...session, phase: "error", answer: null, critique: null,
+      error: "Your analysis is saved. Retry the review.", canRetryReview: true, retryReview }} />);
+    const button = screen.getByRole("button", { name: "Retry review" });
+    button.focus();
+    await user.keyboard("{Enter}");
+    expect(retryReview).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Interpretation finished" })).toBeVisible();
+    expect(screen.queryByText(session.answer!.text)).toBeNull();
   });
 });

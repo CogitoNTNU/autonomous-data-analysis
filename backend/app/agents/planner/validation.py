@@ -21,6 +21,12 @@ def validate_plan(
     registry: ToolRegistry,
 ) -> None:
     """Validate that a plan can be executed with the current dataset and tools."""
+    if not plan.preprocessing_steps and not plan.analysis_steps:
+        raise ValueError(
+            "Plan requires at least one executable step. Inspection metadata is "
+            "planning context, not analysis evidence. Use an analysis tool for "
+            "data-quality questions, or request clarification if unsupported."
+        )
     _validate_required_columns(plan, dataset)
     _validate_unique_step_ids(plan)
     _validate_dependencies(plan)
@@ -106,6 +112,13 @@ def _validate_analysis_steps(
     output_schemas: dict[str, dict[str, object]] = {}
     for step_id in order_steps(ordered_steps):
         step = by_id[step_id]
+        source = step.arguments.get("source_result_id")
+        if source is not None and (
+            source not in step.depends_on or source not in output_schemas
+        ):
+            raise ValueError(
+                "source_result_id must reference a group_aggregate dependency step ID"
+            )
         input_dataset = _analysis_input_dataset(step, dataset, output_schemas)
         _validate_step(step, input_dataset, registry, "analysis")
         if step.tool_name == "group_aggregate":
@@ -126,12 +139,15 @@ def _analysis_input_dataset(
         for name in ("x", "y", "group")
         if isinstance(column := step.arguments.get(name), str)
     }
-    if columns <= set(dataset.dataset_schema):
-        return dataset
     for dependency in step.depends_on:
+        source = step.arguments.get("source_result_id")
+        if source is not None and dependency != source:
+            continue
         schema = output_schemas.get(dependency)
         if schema is not None and columns <= set(schema):
             return dataset.model_copy(update={"dataset_schema": schema})
+    if step.arguments.get("source_result_id") is not None:
+        raise ValueError("Chart columns are absent from the referenced aggregation")
     return dataset
 
 

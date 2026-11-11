@@ -102,3 +102,24 @@ def test_store_named_csv_rejects_path_like_identifiers(tmp_path: Path) -> None:
         store_named_csv(tmp_path, "../outside", b"region,revenue\nNorth,1\n")
 
     assert list(tmp_path.iterdir()) == []
+
+
+def test_named_csv_restoration_is_idempotent(tmp_path: Path) -> None:
+    identifier = "b4b1d847-4e5a-49e0-ab49-9edf98f0e6fe"
+    content = b"value\n1\n"
+    original = store_named_csv(tmp_path, identifier, content)
+
+    restored = store_named_csv(tmp_path, identifier, content)
+
+    assert restored == original
+    assert restored.read_bytes() == content
+
+
+def test_named_csv_cannot_replace_registered_raw_data(tmp_path: Path) -> None:
+    identifier = "b4b1d847-4e5a-49e0-ab49-9edf98f0e6fe"
+    path = store_named_csv(tmp_path, identifier, b"value\n1\n")
+
+    with pytest.raises(ValueError, match="cannot be replaced"):
+        store_named_csv(tmp_path, identifier, b"value\n2\n")
+
+    assert path.read_bytes() == b"value\n1\n"

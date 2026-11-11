@@ -109,6 +109,37 @@ def test_numeric_line_coordinates_are_not_converted_to_categories(
     assert list(saved_figures[0].axes[0].lines[0].get_xdata()) == [1, 10]
 
 
+@pytest.mark.parametrize("row_count", [1, 21421])
+def test_long_line_chart_limits_labels_without_dropping_observations(
+    dataset: DatasetReference,
+    saved_figures: list[Figure],
+    tmp_path: Path,
+    row_count: int,
+) -> None:
+    tool = next(tool for tool in TOOLS if tool.name == "line_chart")
+    timestamps = pd.date_range("2026-01-01", periods=row_count, freq="s").astype(str)
+
+    result = tool.run(
+        dataset,
+        output_dir=tmp_path,
+        title="Measurements over time",
+        x="month",
+        y="sales",
+        _source_rows=[
+            {"month": timestamp, "sales": i} for i, timestamp in enumerate(timestamps)
+        ],
+        _source_sample_size=row_count,
+    )
+
+    axes = saved_figures[0].axes[0]
+    labels = [label.get_text() for label in axes.get_xticklabels()]
+    assert len(labels) == min(row_count, 12)
+    assert labels[0] == timestamps[0]
+    assert labels[-1] == timestamps[-1]
+    assert len(axes.lines[0].get_ydata()) == row_count
+    assert result["sample_size"] == row_count
+
+
 def test_heatmap_preserves_literal_names_and_existing_null_exclusion(
     dataset: DatasetReference, saved_figures: list[Figure], tmp_path: Path
 ) -> None:

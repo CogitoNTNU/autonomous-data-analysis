@@ -4,7 +4,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 
 from backend.app.contracts.models import DatasetReference, WarningEvent
-from backend.app.tools.analysis.files import resolve_csv
+from backend.app.tools.analysis.files import read_frame
 from backend.app.tools.registry import Tool, ToolRegistry
 
 SRC = "descriptive_statistics"
@@ -23,7 +23,7 @@ def _warn(code: str, message: str) -> WarningEvent:
 
 
 def run(dataset: DatasetReference, **kwargs: object) -> dict:
-    frame = pd.read_csv(resolve_csv(dataset.storage_ref))
+    frame = read_frame(dataset)
     rows = len(frame)
     stats: dict[str, dict[str, float | int | None]] = {}
     warnings: list[WarningEvent] = []
@@ -61,7 +61,7 @@ TOOL = Tool(
 )
 
 
-def default_registry() -> ToolRegistry:
+def default_registry(*, isolate_execution: bool = False) -> ToolRegistry:
     from backend.app.tools.analysis.categorical import (
         TOOL as CATEGORICAL_ANALYSIS_TOOL,
     )
@@ -69,12 +69,14 @@ def default_registry() -> ToolRegistry:
     from backend.app.tools.analysis.group_aggregate import (
         TOOL as GROUP_AGGREGATE_TOOL,
     )
+    from backend.app.tools.analysis.missing_values import TOOL as MISSING_VALUES_TOOL
     from backend.app.tools.visualization.catalog import register_visualization
 
-    registry = ToolRegistry()
+    registry = ToolRegistry(isolate_execution=isolate_execution)
     registry.register(TOOL)
     registry.register(CORRELATION_TOOL)
     registry.register(GROUP_AGGREGATE_TOOL)
     registry.register(CATEGORICAL_ANALYSIS_TOOL)
+    registry.register(MISSING_VALUES_TOOL)
     register_visualization(registry)
     return registry

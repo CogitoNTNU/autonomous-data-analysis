@@ -19,6 +19,7 @@ from backend.app.contracts.models import DatasetReference
 from backend.app.contracts.state import create_initial_state
 from backend.app.contracts.workflow import (
     ResumeWorkflow,
+    RetryReview,
     SendMessage,
     WorkflowSnapshot,
 )
@@ -28,6 +29,7 @@ from backend.app.services.chat_model import live_chat_model
 from backend.app.services.lazy_model import lazy_model
 from backend.app.services.workflow_failure import persist_failure
 from backend.app.services.workflow_snapshot import workflow_snapshot
+from backend.app.services.workflow_review import can_retry_review
 from backend.app.services.workflow_waiting import InputKind, require_waiting
 from backend.app.storage.workflow_checkpoints import WorkflowCheckpoints
 from backend.app.tools.registry import ToolRegistry
@@ -101,6 +103,47 @@ class WorkflowService:
             "message",
             {"message": request.message},
         )
+
+    def retry_review(self, request: RetryReview) -> WorkflowSnapshot:
+        run_id = str(request.run_id)
+        lease = self.store.acquire(run_id)
+        try:
+            with self.graph() as graph:
+                snapshot = graph.get_state(_config(run_id))
+                if not snapshot.values:
+                    raise ValueError("Unknown workflow")
+                if (
+                    snapshot.config["configurable"]["checkpoint_id"]
+                    != request.checkpoint_id
+                ):
+                    raise ValueError(
+                        "This workflow has changed. Refresh its status before retrying."
+                    )
+                if not can_retry_review(snapshot.values):
+                    raise ValueError("This workflow has no failed review to retry")
+                graph.update_state(
+                    _config(run_id),
+                    {
+                        "last_node_error": None,
+                        "last_node_status": "success",
+                        "critique": None,
+                        "final_response": None,
+                        "control": snapshot.values["control"].model_copy(
+                            update={
+                                "status": "running",
+                                "current_agent": "interpretation",
+                                "retry_count": 0,
+                                "output_repair_count": 0,
+                            }
+                        ),
+                    },
+                    as_node="interpretation",
+                )
+            self.workers.submit(self._run, run_id, None, lease)
+        except Exception:
+            lease.close()
+            raise
+        return self.status(request.run_id)
 
     def _continue(
         self, run_id: UUID, checkpoint_id: str, kind: InputKind, value: dict[str, str]

@@ -13,7 +13,9 @@ from openai import (
 
 from backend.app.contracts.dialogue import ChatReply
 from backend.app.core.llm_config import load_llm_settings
-from backend.app.core.llm_errors import raise_provider_error
+from backend.app.core.llm_errors import raise_model_timeout, raise_provider_error
+from backend.app.core.llm_transport import model_timeout
+from backend.app.core.exceptions import ModelConnectionError
 
 from .context import serialize_context
 from .schema import ChatContext
@@ -27,7 +29,7 @@ class ChatLLM:
             base_url=str(self.settings.base_url),
             api_key=self.settings.api_key.get_secret_value(),
             max_retries=0,
-            timeout=self.settings.timeout_seconds,
+            timeout=model_timeout(self.settings.timeout_seconds),
         )
 
     def __call__(self, prompt: str, context: ChatContext) -> ChatReply:
@@ -49,9 +51,9 @@ class ChatLLM:
                 **self.settings.completion.request_kwargs(),
             )
         except APITimeoutError as error:
-            raise TimeoutError("The Chat model timed out.") from error
+            raise_model_timeout(error, "Chat")
         except APIConnectionError as error:
-            raise ConnectionError("The Chat provider is unreachable.") from error
+            raise ModelConnectionError("The Chat provider is unreachable.") from error
         except APIStatusError as error:
             raise_provider_error(error, "Chat")
         except APIResponseValidationError as error:

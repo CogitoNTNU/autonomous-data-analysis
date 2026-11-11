@@ -8,7 +8,7 @@ const preview = { fileName: "ages.csv", fileSize: 10, rowCount: 2, columnCount: 
 const initial: WorkflowSnapshot = {
   runId: "run-1", checkpointId: "checkpoint-1", status: "running", activeAgent: "planner",
   question: null, plan: null, report: null, analysis: null, interpretation: null, critique: null, answer: null, error: null,
-  dialogue: [], analysisRound: 1, acceptsMessages: false,
+  dialogue: [], analysisRound: 1, acceptsMessages: false, canRetryReview: false,
 };
 const answer = { text: "Age summary", findings: [], limitations: [], figureIds: [], followUps: [] };
 const done: WorkflowSnapshot = { ...initial, status: "completed", activeAgent: null, answer, acceptsMessages: true };
@@ -20,6 +20,7 @@ function fakeClient() {
     status: vi.fn().mockResolvedValue({ ...initial, status: "completed", answer }),
     resume: vi.fn().mockResolvedValue(initial),
     message: vi.fn().mockResolvedValue({ ...done, status: "running" }),
+    retryReview: vi.fn().mockResolvedValue(done),
   };
 }
 async function completeRun(client: ReturnType<typeof fakeClient>) {
@@ -125,5 +126,25 @@ describe("harness session", () => {
     act(() => result.current.submitQuestion("Describe age"));
     expect(result.current.error).toBe("Invalid CSV");
     expect(client.start).not.toHaveBeenCalled();
+  });
+
+  it("retries the failed review on the same checkpoint without starting over", async () => {
+    const client = fakeClient();
+    const interpretation = { summary: "Saved draft", findings: [], limitations: [], unanswered: [], source: {} };
+    client.start.mockResolvedValue({ ...initial, status: "error", activeAgent: "critic",
+      error: "Your analysis is saved.", canRetryReview: true, interpretation });
+    const { result } = renderHook(() => usePlannerSession(client));
+    await act(async () => { await result.current.acceptDataset(preview, file); });
+    act(() => result.current.submitQuestion("Describe age"));
+    await waitFor(() => expect(result.current.canRetryReview).toBe(true));
+    client.retryReview.mockResolvedValue({ ...done, interpretation });
+
+    act(() => { result.current.retryReview(); result.current.retryReview(); });
+
+    await waitFor(() => expect(result.current.phase).toBe("complete"));
+    expect(client.retryReview).toHaveBeenCalledTimes(1);
+    expect(client.retryReview).toHaveBeenCalledWith({ runId: "run-1", checkpointId: "checkpoint-1" }, expect.any(AbortSignal));
+    expect(client.start).toHaveBeenCalledTimes(1);
+    expect(result.current.interpretation).toEqual(interpretation);
   });
 });

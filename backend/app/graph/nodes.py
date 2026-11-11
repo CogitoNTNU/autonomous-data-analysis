@@ -23,10 +23,15 @@ from backend.app.contracts.models import (
 )
 from backend.app.contracts.responses import AgentResponse
 from backend.app.contracts.state import AgentState
-from backend.app.core.exceptions import ModelProviderError
+from backend.app.core.exceptions import (
+    ModelConnectionError,
+    ModelOutputError,
+    ModelProviderError,
+)
 from backend.app.tools.registry import ToolRegistry
 
 from .preprocessing_repair import repair_critique
+from .output_repair import output_feedback
 from .responses import AgentStateUpdate, translate_agent_response
 from .routes import critique_error
 
@@ -35,7 +40,12 @@ def planner_graph_node(
     state: AgentState, registry: ToolRegistry, model: PlannerModel
 ) -> AgentStateUpdate:
     try:
-        response = planner_node(deepcopy(state), registry, model)
+        response = planner_node(
+            deepcopy(state),
+            registry,
+            model,
+            output_feedback=output_feedback(state["last_node_error"]),
+        )
     except (ValueError, OSError, ModelProviderError) as error:
         response = AgentResponse[PlannerUpdates](
             status="error",
@@ -99,7 +109,11 @@ def critic_graph_node(state: AgentState, model: CriticModel) -> AgentStateUpdate
     """Evaluate one draft, recording unsupported or exhausted revisions explicitly."""
     try:
         # Critic models receive mutable context; protect authoritative evidence.
-        response = critic_node(deepcopy(state), model=model)
+        response = critic_node(
+            deepcopy(state),
+            model=model,
+            output_feedback=output_feedback(state["last_node_error"]),
+        )
         if response.error is not None:
             response = AgentResponse[CriticUpdates](
                 status="error",
@@ -135,6 +149,11 @@ def critic_graph_node(state: AgentState, model: CriticModel) -> AgentStateUpdate
             "critic_decision": critique.decision if critique is not None else None,
             "revision_count": state["control"].revision_count,
             "error_category": error.code if error else None,
+            "output_reason": error.details.get("output_reason") if error else None,
+            "validation_types": error.details.get("validation_types")
+            if error
+            else None,
+            "output_repair_count": updates["control"].output_repair_count,
         },
     )
     return updates
@@ -147,9 +166,19 @@ def _execution_error(error: Exception, source: AgentName) -> AgentError:
         code = "TIMEOUT"
     elif isinstance(error, ValueError):
         code = "INVALID_OUTPUT"
+    details = {}
+    if isinstance(error, ModelOutputError):
+        details = {
+            "reason": "model_output_invalid",
+            "output_reason": error.reason,
+            "validation_types": error.validation_types,
+        }
+    elif isinstance(error, ModelConnectionError):
+        details = {"reason": "model_connection_failed"}
     return AgentError(
         code=code,
         message=f"The {source} attempt failed.",
         source=source,
         retryable=isinstance(error, (TimeoutError, ConnectionError)),
+        details=details,
     )
